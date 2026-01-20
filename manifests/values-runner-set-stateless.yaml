@@ -1,12 +1,10 @@
 # ==============================================================================
-# ARC Runner Scale Set - Stateless (For Comparison)
+# ARC Runner Scale Set - Stateless (Organization Level)
 # ==============================================================================
-# This configuration deploys a runner WITHOUT persistent caching.
-# It uses an emptyDir volume for Docker storage, meaning the cache is lost
-# every time the pod restarts (which happens after every job).
+# This configuration deploys runners available to the ENTIRE Organization.
 # ==============================================================================
 
-githubConfigUrl: "https://github.com/CodeByNikolas/artemis-theia-blueprints"
+githubConfigUrl: "https://github.com/ls1intum"
 githubConfigSecret: github-arc-secret
 
 minRunners: 0
