@@ -1,0 +1,115 @@
+# ==============================================================================
+# ARC Runner Scale Set 3 - Helm Values
+# ==============================================================================
+# This configuration deploys a GitHub Actions self-hosted runner with:
+# - Persistent Docker layer caching (100Gi PVC)
+# - Docker-in-Docker (DinD) setup with validated working configuration
+# - Organization-wide runner registration for ls1intum
+#
+# Target workloads:
+#   - artemis-theia-blueprints: C + Rust images
+#   - theia-cloud: service image
+# ==============================================================================
+
+# GitHub Configuration
+githubConfigUrl: "https://github.com/ls1intum"
+githubConfigSecret: github-arc-secret
+
+# Runner scale set configuration
+# CRITICAL: maxRunners MUST be 1 due to ReadWriteOnce PVC limitation
+minRunners: 0
+maxRunners: 1
+
+# Runner pod template with Docker-in-Docker
+template:
+  spec:
+    containers:
+      # ========================================
+      # Main runner container
+      # ========================================
+      - name: runner
+        image: ghcr.io/actions/actions-runner:latest
+        command:
+          - bash
+          - -c
+          - |
+            #!/bin/bash
+            # CRITICAL: Wait for Docker daemon to be ready
+            # Without this, workflows fail with "cannot connect to Docker daemon"
+            echo "Waiting for Docker daemon..."
+            for i in {1..60}; do
+              if docker info >/dev/null 2>&1; then
+                echo "Docker is ready!"
+                break
+              fi
+              echo "Waiting for Docker... ($i/60)"
+              sleep 1
+            done
+            
+            # Start the GitHub Actions runner
+            /home/runner/run.sh
+        
+        env:
+          # CRITICAL: Use Unix socket, NOT TCP (tcp://localhost:2376 causes failures)
+          - name: DOCKER_HOST
+            value: unix:///var/run/docker.sock
+        
+        volumeMounts:
+          - name: work
+            mountPath: /home/runner/_work
+          - name: dind-sock
+            mountPath: /var/run
+
+      # ========================================
+      # Docker-in-Docker (DinD) container
+      # ========================================
+      - name: dind
+        image: docker:dind
+        args:
+          - dockerd
+          - --host=unix:///var/run/docker.sock
+          - --group=123  # Match runner container group
+        
+        securityContext:
+          privileged: true  # Required for DinD
+        
+        volumeMounts:
+          - name: work
+            mountPath: /home/runner/_work
+          - name: dind-sock
+            mountPath: /var/run
+          - name: docker-cache
+            mountPath: /var/lib/docker  # Persistent Docker layer cache
+
+    # ========================================
+    # Volumes
+    # ========================================
+    volumes:
+      # Shared workspace between runner and DinD
+      - name: work
+        emptyDir: {}
+      
+      # Shared Docker socket
+      - name: dind-sock
+        emptyDir: {}
+      
+      # Persistent Docker cache (100Gi PVC)
+      - name: docker-cache
+        persistentVolumeClaim:
+          claimName: docker-cache-pvc-3
+
+# Resource limits
+resources:
+  limits:
+    cpu: "4"
+    memory: "16Gi"
+  requests:
+    cpu: "2"
+    memory: "8Gi"
+
+# Pod labels for identification and scheduling
+podLabels:
+  app: arc-runner
+  runner-set: "3"
+  cache-enabled: "true"
+  managed-by: theia-arc-runners

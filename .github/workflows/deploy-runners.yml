@@ -1,0 +1,224 @@
+# ==============================================================================
+# Reusable Workflow: Deploy ARC Runners
+# ==============================================================================
+# This workflow deploys GitHub Actions self-hosted runners using Actions Runner
+# Controller (ARC) with persistent Docker layer caching.
+#
+# Purpose:
+#   - Deploy ARC controller and runner scale sets to Kubernetes
+#   - Create persistent volume claims for Docker layer caching
+#   - Configure Docker-in-Docker (DinD) with validated working setup
+#
+# Usage:
+#   Called by deploy-manual.yml workflow (manual trigger only)
+#
+# Required GitHub Environment: arc-runners
+#   Secrets:
+#     - KUBECONFIG: Kubernetes cluster configuration
+#     - GH_PAT: GitHub Personal Access Token with admin:org + repo + workflow scopes
+#
+# Parameters:
+#   - runner_set: Which runner set to deploy (1, 2, 3, or 'all')
+# ==============================================================================
+
+name: Deploy ARC Runners
+
+on:
+  workflow_call:
+    inputs:
+      runner_set:
+        description: "Runner set to deploy (1, 2, 3, or 'all')"
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    name: Deploy Runner Set ${{ inputs.runner_set }}
+    runs-on: ubuntu-latest
+    environment: arc-runners  # GitHub Environment for secrets and protection
+    
+    steps:
+      # ========================================
+      # Step 1: Checkout repository
+      # ========================================
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ========================================
+      # Step 2: Setup Helm CLI
+      # ========================================
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      # ========================================
+      # Step 3: Configure kubectl
+      # ========================================
+      - name: Setup Kubeconfig
+        run: |
+          # Write kubeconfig from secret to file
+          echo "${{ secrets.KUBECONFIG }}" > kubeconfig
+          export KUBECONFIG=$PWD/kubeconfig
+          chmod 600 kubeconfig
+
+          # Verify connection to cluster
+          echo "Connected to cluster:"
+          kubectl config get-contexts
+          echo ""
+          echo "Cluster nodes:"
+          kubectl get nodes
+
+      # ========================================
+      # Step 4: Create namespaces
+      # ========================================
+      - name: Create Namespaces
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+        run: |
+          echo "Creating arc-systems namespace..."
+          kubectl create namespace arc-systems --dry-run=client -o yaml | kubectl apply -f -
+          
+          echo "Creating arc-runners namespace..."
+          kubectl create namespace arc-runners --dry-run=client -o yaml | kubectl apply -f -
+
+      # ========================================
+      # Step 5: Install ARC Controller
+      # ========================================
+      - name: Install ARC Controller
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+        run: |
+          echo "Installing Actions Runner Controller..."
+          
+          # Check if controller already exists
+          if helm list -n arc-systems | grep -q "arc"; then
+            echo "ARC controller already installed, upgrading..."
+            helm upgrade arc \
+              --namespace arc-systems \
+              oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller
+          else
+            echo "Installing ARC controller for the first time..."
+            helm install arc \
+              --namespace arc-systems \
+              --create-namespace \
+              oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller
+          fi
+          
+          echo "Waiting for ARC controller to be ready..."
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/name=gha-runner-scale-set-controller \
+            -n arc-systems \
+            --timeout=300s
+
+      # ========================================
+      # Step 6: Create GitHub PAT Secret
+      # ========================================
+      - name: Create GitHub Secret
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+        run: |
+          echo "Creating GitHub PAT secret..."
+          kubectl create secret generic github-arc-secret \
+            --namespace=arc-runners \
+            --from-literal=github_token='${{ secrets.GH_PAT }}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      # ========================================
+      # Step 7: Deploy PVCs
+      # ========================================
+      - name: Deploy Persistent Volume Claims
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+        run: |
+          echo "Deploying PVCs for runner set: ${{ inputs.runner_set }}"
+          
+          if [[ "${{ inputs.runner_set }}" == "all" ]]; then
+            echo "Deploying all PVCs..."
+            kubectl apply -f manifests/pvc-docker-cache-1.yaml
+            kubectl apply -f manifests/pvc-docker-cache-2.yaml
+            kubectl apply -f manifests/pvc-docker-cache-3.yaml
+          else
+            echo "Deploying PVC for runner set ${{ inputs.runner_set }}..."
+            kubectl apply -f manifests/pvc-docker-cache-${{ inputs.runner_set }}.yaml
+          fi
+          
+          echo ""
+          echo "PVC Status:"
+          kubectl get pvc -n arc-runners
+
+      # ========================================
+      # Step 8: Deploy Runner Scale Sets
+      # ========================================
+      - name: Deploy Runner Scale Sets
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+        run: |
+          echo "Deploying runner scale sets for: ${{ inputs.runner_set }}"
+          
+          if [[ "${{ inputs.runner_set }}" == "all" ]]; then
+            echo "Deploying all 3 runner scale sets..."
+            for i in 1 2 3; do
+              echo ""
+              echo "================================================"
+              echo "Deploying arc-runner-set-$i..."
+              echo "================================================"
+              
+              helm upgrade --install arc-runner-set-$i \
+                --namespace arc-runners \
+                oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set \
+                -f manifests/values-runner-set-$i.yaml
+              
+              echo "✅ arc-runner-set-$i deployment initiated"
+            done
+          else
+            echo "Deploying single runner scale set: arc-runner-set-${{ inputs.runner_set }}"
+            
+            helm upgrade --install arc-runner-set-${{ inputs.runner_set }} \
+              --namespace arc-runners \
+              oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set \
+              -f manifests/values-runner-set-${{ inputs.runner_set }}.yaml
+            
+            echo "✅ arc-runner-set-${{ inputs.runner_set }} deployment initiated"
+          fi
+
+      # ========================================
+      # Step 9: Verify Deployment
+      # ========================================
+      - name: Verify Deployment
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+        run: |
+          echo ""
+          echo "================================================"
+          echo "Deployment Verification"
+          echo "================================================"
+          
+          echo ""
+          echo "ARC Controller Status:"
+          echo "----------------------"
+          kubectl get pods -n arc-systems -l app.kubernetes.io/name=gha-runner-scale-set-controller
+          
+          echo ""
+          echo "Listener Pods (may take 30-60 seconds to appear):"
+          echo "-------------------------------------------------"
+          kubectl get pods -n arc-systems | grep listener || echo "⏳ No listeners yet (check again in 30 seconds)"
+          
+          echo ""
+          echo "PVC Status:"
+          echo "----------"
+          kubectl get pvc -n arc-runners
+          
+          echo ""
+          echo "Runner Pods (ephemeral, appear only when jobs are running):"
+          echo "-----------------------------------------------------------"
+          kubectl get pods -n arc-runners || echo "No runner pods (expected when idle)"
+          
+          echo ""
+          echo "✅ Deployment complete!"
+          echo ""
+          echo "Next steps:"
+          echo "1. Wait 30-60 seconds for listener pods to register with GitHub"
+          echo "2. Check GitHub → Settings → Actions → Runners to verify runners appear"
+          echo "3. Trigger a workflow in artemis-theia-blueprints or theia-cloud"
+          echo "4. Monitor with: kubectl get pods -n arc-runners -w"

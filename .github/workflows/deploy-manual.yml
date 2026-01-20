@@ -1,0 +1,54 @@
+# ==============================================================================
+# Manual Deployment Workflow
+# ==============================================================================
+# This workflow provides a manual trigger for deploying ARC runner infrastructure.
+# 
+# Purpose:
+#   - Deploy runner scale sets on-demand with explicit control
+#   - Allow selective deployment (individual runner set or all at once)
+#   - Ensure human oversight before infrastructure changes
+#
+# Trigger:
+#   Manual only - via "Run workflow" button in GitHub Actions UI
+#
+# Target:
+#   - Kubernetes cluster (same cluster as Theia Cloud)
+#   - Namespaces: arc-systems (controller), arc-runners (runners)
+#
+# Usage:
+#   1. Navigate to Actions → Manual Deployment
+#   2. Click "Run workflow"
+#   3. Select runner set: all, 1, 2, or 3
+#   4. Click "Run workflow"
+#   5. Wait for approval (if GitHub Environment protection is enabled)
+#   6. Monitor deployment progress
+#
+# Security:
+#   - Uses GitHub Environment 'arc-runners' for secrets and protection
+#   - Requires KUBECONFIG and GH_PAT secrets to be configured
+#   - Can be configured with approval requirements in Environment settings
+# ==============================================================================
+
+name: Manual Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner_set:
+        description: 'Runner set to deploy'
+        required: true
+        type: choice
+        default: 'all'
+        options:
+          - all
+          - '1'
+          - '2'
+          - '3'
+
+jobs:
+  deploy:
+    name: Deploy Runner Sets
+    uses: ./.github/workflows/deploy-runners.yml
+    with:
+      runner_set: ${{ inputs.runner_set }}
+    secrets: inherit
