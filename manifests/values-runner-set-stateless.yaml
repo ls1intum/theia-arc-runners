@@ -1,0 +1,55 @@
+# ==============================================================================
+# ARC Runner Scale Set - Stateless (For Comparison)
+# ==============================================================================
+# This configuration deploys a runner WITHOUT persistent caching.
+# It uses an emptyDir volume for Docker storage, meaning the cache is lost
+# every time the pod restarts (which happens after every job).
+# ==============================================================================
+
+githubConfigUrl: "https://github.com/CodeByNikolas/artemis-theia-blueprints"
+githubConfigSecret: github-arc-secret
+
+minRunners: 0
+maxRunners: 10  # Scaled up for parallel execution
+
+template:
+  spec:
+    containers:
+      - name: runner
+        image: ghcr.io/actions/actions-runner:latest
+        command: ["bash", "-c", "echo 'Waiting for Docker...'; for i in {1..60}; do if docker info >/dev/null 2>&1; then break; fi; sleep 1; done; /home/runner/run.sh"]
+        env:
+          - name: DOCKER_HOST
+            value: unix:///var/run/docker.sock
+        volumeMounts:
+          - name: work
+            mountPath: /home/runner/_work
+          - name: dind-sock
+            mountPath: /var/run
+
+      - name: dind
+        image: docker:dind
+        args: ["dockerd", "--host=unix:///var/run/docker.sock", "--group=123"]
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - name: work
+            mountPath: /home/runner/_work
+          - name: dind-sock
+            mountPath: /var/run
+          - name: docker-storage
+            mountPath: /var/lib/docker
+          - name: dind-config
+            mountPath: /etc/docker/daemon.json
+            subPath: daemon.json
+
+    volumes:
+      - name: work
+        emptyDir: {}
+      - name: dind-sock
+        emptyDir: {}
+      - name: docker-storage
+        emptyDir: {}  # <--- STATELESS: Lost on restart!
+      - name: dind-config
+        configMap:
+          name: dind-daemon-config

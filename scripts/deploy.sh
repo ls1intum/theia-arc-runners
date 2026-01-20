@@ -9,8 +9,8 @@
 #   ./scripts/deploy.sh [runner_set]
 #
 # Parameters:
-#   runner_set: Which runner set to deploy (1, 2, 3, or 'all')
-#               Default: 'all'
+#   runner_set: Which runner set to deploy ('stateless')
+#               Default: 'stateless'
 #
 # Prerequisites:
 #   - kubectl configured for target Kubernetes cluster
@@ -18,9 +18,7 @@
 #   - GITHUB_PAT environment variable set (or secret created manually)
 #
 # Examples:
-#   ./scripts/deploy.sh all      # Deploy all 3 runner sets
-#   ./scripts/deploy.sh 1        # Deploy only runner set 1
-#   ./scripts/deploy.sh 2        # Deploy only runner set 2
+#   ./scripts/deploy.sh stateless      # Deploy stateless runner set
 #
 # Environment Variables:
 #   GITHUB_PAT: GitHub Personal Access Token (admin:org + repo + workflow scopes)
@@ -33,12 +31,12 @@ set -e  # Exit on error
 # ========================================
 NAMESPACE_SYSTEMS="arc-systems"
 NAMESPACE_RUNNERS="arc-runners"
-RUNNER_SET="${1:-all}"
+RUNNER_SET="${1:-stateless}"
 
 # Validate runner set parameter
-if [[ ! "$RUNNER_SET" =~ ^(all|1|2|3)$ ]]; then
+if [[ ! "$RUNNER_SET" =~ ^(stateless)$ ]]; then
   echo "❌ Error: Invalid runner set '$RUNNER_SET'"
-  echo "   Valid options: all, 1, 2, 3"
+  echo "   Valid options: stateless"
   exit 1
 fi
 
@@ -123,21 +121,7 @@ echo ""
 # Step 4: Deploy PVCs
 # ========================================
 echo "💾 Step 4/6: Deploying Persistent Volume Claims..."
-
-if [ "$RUNNER_SET" == "all" ]; then
-  echo "Deploying all PVCs..."
-  kubectl apply -f manifests/pvc-docker-cache-1.yaml
-  kubectl apply -f manifests/pvc-docker-cache-2.yaml
-  kubectl apply -f manifests/pvc-docker-cache-3.yaml
-else
-  echo "Deploying PVC for runner set $RUNNER_SET..."
-  kubectl apply -f manifests/pvc-docker-cache-${RUNNER_SET}.yaml
-fi
-
-echo ""
-echo "PVC Status:"
-kubectl get pvc -n $NAMESPACE_RUNNERS
-echo "✅ PVCs deployed"
+echo "Skipping PVC deployment (Stateless Mode)"
 echo ""
 
 # ========================================
@@ -145,31 +129,14 @@ echo ""
 # ========================================
 echo "🏃 Step 5/6: Deploying runner scale sets..."
 
-if [ "$RUNNER_SET" == "all" ]; then
-  echo "Deploying all 3 runner scale sets..."
-  for i in 1 2 3; do
-    echo ""
-    echo "------------------------------------------------"
-    echo "Deploying arc-runner-set-$i..."
-    echo "------------------------------------------------"
-    
-    helm upgrade --install arc-runner-set-$i \
-      --namespace $NAMESPACE_RUNNERS \
-      oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set \
-      -f manifests/values-runner-set-$i.yaml
-    
-    echo "✅ arc-runner-set-$i deployment initiated"
-  done
-else
-  echo "Deploying single runner scale set: arc-runner-set-${RUNNER_SET}"
-  
-  helm upgrade --install arc-runner-set-${RUNNER_SET} \
-    --namespace $NAMESPACE_RUNNERS \
-    oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set \
-    -f manifests/values-runner-set-${RUNNER_SET}.yaml
-  
-  echo "✅ arc-runner-set-${RUNNER_SET} deployment initiated"
-fi
+echo "Deploying single runner scale set: arc-runner-set-${RUNNER_SET}"
+
+helm upgrade --install arc-runner-set-${RUNNER_SET} \
+  --namespace $NAMESPACE_RUNNERS \
+  oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set \
+  -f manifests/values-runner-set-${RUNNER_SET}.yaml
+
+echo "✅ arc-runner-set-${RUNNER_SET} deployment initiated"
 echo ""
 
 # ========================================

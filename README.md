@@ -1,14 +1,16 @@
 # Theia ARC Runners
 
-Infrastructure-as-code for deploying **GitHub Actions self-hosted runners** using Actions Runner Controller (ARC) with **persistent Docker layer caching**.
+Infrastructure-as-code for deploying **GitHub Actions self-hosted runners** using Actions Runner Controller (ARC).
+
+We have transitioned from **stateful (PVC-based)** runners to **stateless runners with transparent registry caching** and a local Harbor mirror.
 
 ## Features
 
-- ✅ **3 Runner Scale Sets** with sticky assignment for optimal cache reuse
-- ✅ **Persistent Docker Layer Caching** (100Gi PVCs per runner)
-- ✅ **Docker-in-Docker (DinD)** configuration with validated working setup
-- ✅ **Automated GitHub Actions deployment** or manual deployment via script
-- ✅ **Organization-wide runners** for `ls1intum` repositories
+- ✅ **Stateless Runner Scale Set** (`arc-runner-set-stateless`) that scales horizontally (up to 10 runners).
+- ✅ **Transparent Registry Caching** using Harbor as a pull-through cache for `docker.io` and `ghcr.io`.
+- ✅ **Optimized Build Pipelines** leveraging Docker's `cache-from` / `cache-to` (Registry Cache) for speed.
+- ✅ **Automated GitHub Actions deployment** or manual deployment via script.
+- ✅ **Organization-wide runners** for `ls1intum` repositories.
 
 ## Quick Start
 
@@ -17,7 +19,7 @@ Infrastructure-as-code for deploying **GitHub Actions self-hosted runners** usin
 - Kubernetes cluster (same cluster as Theia Cloud recommended)
 - `kubectl` configured for your cluster
 - Helm 3.14+ installed
-- GitHub PAT with `repo` + `workflow` + `admin:org` scopes
+- GITHUB_PAT environment variable set (or secret created manually)
 
 ### Option 1: GitHub Actions Deployment (Recommended)
 
@@ -30,7 +32,7 @@ Infrastructure-as-code for deploying **GitHub Actions self-hosted runners** usin
 
 2. **Trigger Deployment**:
    - Go to **Actions** → **Manual Deployment**
-   - Select runner set to deploy: `all`, `1`, `2`, or `3`
+   - Select runner set to deploy: `stateless`
    - Click **Run workflow**
 
 ### Option 2: Manual Deployment
@@ -41,73 +43,22 @@ You can deploy directly from your local machine using the provided script.
 # Set your GitHub PAT
 export GITHUB_PAT="ghp_xxxxxxxxxxxx"
 
-# Deploy all runner sets
-./scripts/deploy.sh all
-
-# Or deploy a specific runner set
-./scripts/deploy.sh 1
+# Deploy stateless runner set
+./scripts/deploy.sh stateless
 ```
 
 ## Architecture
 
-The system deploys 3 independent runner scale sets, each with its own persistent volume claim (PVC) for Docker caching.
+The system deploys a single, scalable runner set. Runners are ephemeral and stateless, meaning they start with a clean slate for every job. Caching is handled via:
 
-```
-┌───────────────────────────────────────────────────┐
-│         ls1intum GitHub Organization              │
-├───────────────────────────────────────────────────┤
-│  ┌──────────────────┐   ┌──────────────────┐      │
-│  │ artemis-theia-   │   │  theia-cloud     │      │
-│  │   blueprints     │   │                  │      │
-│  └────────┬─────────┘   └────────┬─────────┘      │
-│           │                      │                │
-│           └──────────┬───────────┘                │
-│                      │                            │
-└──────────────────────┼────────────────────────────┘
-                       │ (Workflows trigger jobs)
-                       ▼
-┌───────────────────────────────────────────────────┐
-│           Kubernetes Cluster (arc-*)              │
-├───────────────────────────────────────────────────┤
-│  Namespace: arc-systems                           │
-│  ┌─────────────────────────────────────────────┐  │
-│  │  ARC Controller                             │  │
-│  │  ├─ Listener: arc-runner-set-1              │  │
-│  │  ├─ Listener: arc-runner-set-2              │  │
-│  │  └─ Listener: arc-runner-set-3              │  │
-│  └─────────────────────────────────────────────┘  │
-│                                                   │
-│  Namespace: arc-runners                           │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐   │
-│  │ Runner 1   │  │ Runner 2   │  │ Runner 3   │   │
-│  │  (100Gi)   │  │  (100Gi)   │  │  (100Gi)   │   │
-│  │  PVC-1     │  │  PVC-2     │  │  PVC-3     │   │
-│  └────────────┘  └────────────┘  └────────────┘   │
-└───────────────────────────────────────────────────┘
-```
-
-## Runner Assignment Strategy
-
-To maximize cache hit rates, we use "sticky" runner assignment:
-
-| Runner Set | Target Repositories | Sticky Jobs (Cache Affinity) |
-|-----------|-------------------|-----------------------------|
-| `arc-runner-set-1` | artemis-theia-blueprints | Base + Haskell + Python |
-| `arc-runner-set-2` | artemis-theia-blueprints | JavaScript + OCaml + Java-17 |
-| `arc-runner-set-3` | artemis-theia-blueprints | C + Rust |
-| All sets | theia-cloud | landing-page, operator, service |
+1.  **Registry Caching:** BuildKit pushes cache layers to `ghcr.io/.../build-cache`.
+2.  **Harbor Mirror:** A local Harbor instance acts as a pull-through cache for base images (e.g., `node:22`), avoiding repeated internet downloads.
 
 ## Performance
 
-**Validated Results** (Test Image):
-- Cold cache: ~2 minutes
-- Warm cache: ~25 seconds
-- **Improvement: 76% faster (4.3x speedup)**
-
-**Expected Results** (Production Images):
-- Cold cache: 15-20 minutes
-- Warm cache: 5-8 minutes
-- **Improvement: 60-70% faster**
+- **Stateless + Registry Cache:** Comparable to warm stateful runners for build steps, but significantly more scalable and resilient.
+- **Base Image Pulls:** < 5s (cached in Harbor/Local Network) vs 30-60s (Internet).
+- **Dependency Caching:** Handled via Docker BuildKit (`--mount=type=cache`).
 
 ## Documentation
 
