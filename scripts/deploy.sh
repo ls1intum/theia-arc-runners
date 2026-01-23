@@ -86,9 +86,23 @@ echo "✅ ARC Controller ready"
 echo ""
 
 # ========================================
-# Step 3: Create GitHub PAT Secret
+# Step 3: Deploy ConfigMaps (Harbor Mirror)
 # ========================================
-echo "🔑 Step 3/6: Creating GitHub PAT secret..."
+echo "⚙️  Step 3/6: Deploying ConfigMaps..."
+
+# Create namespace if it doesn't exist
+kubectl create namespace $NAMESPACE_RUNNERS --dry-run=client -o yaml | kubectl apply -f -
+
+# Deploy Harbor Mirror Config (Required for dind runners)
+kubectl apply -f manifests/configmap-dind.yaml
+
+echo "✅ ConfigMaps deployed"
+echo ""
+
+# ========================================
+# Step 4: Create GitHub PAT Secret
+# ========================================
+echo "🔑 Step 4/6: Creating GitHub PAT secret..."
 
 if [ -z "$GITHUB_PAT" ]; then
   echo "⚠️  GITHUB_PAT environment variable not set."
