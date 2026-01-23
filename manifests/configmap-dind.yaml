@@ -6,6 +6,6 @@ metadata:
 data:
   daemon.json: |
     {
-        "registry-mirrors": ["https://docker-mirror.ase.in.tum.de:8765"],
-        "insecure-registries": ["docker-mirror.ase.in.tum.de:8765"]
+        "registry-mirrors": [],
+        "insecure-registries": []
     }
