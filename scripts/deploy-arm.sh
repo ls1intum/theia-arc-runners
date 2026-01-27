@@ -29,14 +29,14 @@ set -e  # Exit on error
 # ========================================
 # Configuration
 # ========================================
-NAMESPACE_SYSTEMS="arc-systems"
-NAMESPACE_RUNNERS="arc-runners"
-RUNNER_SET="${1:-stateless}"
+NAMESPACE_SYSTEMS="parma" # ARM namespace for Systems
+NAMESPACE_RUNNERS="parma" # ARM namespace for Runners
+RUNNER_SET="${1:-arm64}"
 
 # Validate runner set parameter
-if [[ ! "$RUNNER_SET" =~ ^(stateless)$ ]]; then
+if [[ ! "$RUNNER_SET" =~ ^(arm64)$ ]]; then
   echo "❌ Error: Invalid runner set '$RUNNER_SET'"
-  echo "   Valid options: stateless"
+  echo "   Valid options: arm64"
   exit 1
 fi
 
