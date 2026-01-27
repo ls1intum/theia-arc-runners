@@ -25,14 +25,16 @@ Both clusters are considered **Development Environments**, requiring aggressive 
     *   **Included**: `arc-runners`, `default`, and all other dev namespaces.
 *   **Why**: Ensures runners and dev workloads always use the absolute latest image version immediately after a push, preventing stale cache issues.
 
-### 3. Actions Runner Controller (ARC) - Kubernetes Mode
+### 3. Actions Runner Controller (ARC) - Hybrid Mode (Stateless + DinD)
 *   **Type**: Helm Release
-*   **Mode**: `containerMode: kubernetes`
+*   **Mode**: Manual Template Configuration (Simulating `kubernetes` mode)
 *   **Function**:
     *   Controller spawns a "Listener" pod.
     *   When a job is received, the Listener creates a **new Pod** for that specific job.
-    *   No DinD sidecar. No PVCs.
-    *   Leverages host `containerd` (and thus Spegel) for image pulls.
+    *   **DinD Sidecar**: Added manually to support `docker build` workflows.
+    *   **Stateless**: Uses `emptyDir` volumes (RAM/Disk) instead of PVCs for speed.
+    *   **Host Execution**: Jobs run on the runner container but communicate with the DinD sidecar via socket.
+    *   **Caching**: DinD sidecar is configured to use Spegel as a registry mirror.
 
 ## Cluster Specifics
 

@@ -1,7 +1,7 @@
 # ==============================================================================
 # ARC Runner Scale Set - Stateless (AMD64 / TheiaProd)
 # ==============================================================================
-# Architecture V2: Stateless Kubernetes Mode
+# Architecture V2: Stateless Kubernetes Mode (Manual DinD Configuration)
 # ==============================================================================
 
 githubConfigUrl: "https://github.com/ls1intum"
@@ -10,26 +10,49 @@ githubConfigSecret: github-arc-secret
 minRunners: 2
 maxRunners: 30
 
-# Container Mode: Kubernetes (Spawns a new pod for each job)
-containerMode:
-  type: kubernetes
-  kubernetesModeWorkVolumeClaim:
-    accessModes: ["ReadWriteOnce"]
-    storageClassName: "local-path" # Or standard/default
-    resources:
-      requests:
-        storage: 1Gi
+# We use manual configuration to set up a Docker-in-Docker (DinD) environment.
+# This allows the runner to build Docker images and run containerized jobs
+# using the sidecar Docker daemon.
 
 template:
   spec:
-    serviceAccountName: arc-runner-set-stateless-sa # Needs RBAC
+    serviceAccountName: arc-runner-set-stateless-sa
+    initContainers:
+      - name: init-dind-externals
+        image: ghcr.io/actions/actions-runner:latest
+        command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
+        volumeMounts:
+          - name: dind-externals
+            mountPath: /home/runner/tmpDir
     containers:
+      - name: dind
+        image: docker:dind
+        args:
+          - dockerd
+          - --host=unix:///var/run/docker.sock
+          - --group=1001 # Standard runner group ID
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - name: work
+            mountPath: /home/runner/_work
+          - name: dind-sock
+            mountPath: /var/run
+          - name: dind-externals
+            mountPath: /home/runner/externals
       - name: runner
         image: ghcr.io/actions/actions-runner:latest
         command: ["/home/runner/run.sh"]
         env:
+          - name: DOCKER_HOST
+            value: unix:///var/run/docker.sock
           - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
             value: "false"
+        volumeMounts:
+          - name: work
+            mountPath: /home/runner/_work
+          - name: dind-sock
+            mountPath: /var/run
         resources:
           requests:
             cpu: 500m
@@ -37,3 +60,10 @@ template:
           limits:
             cpu: 4000m
             memory: 8Gi
+    volumes:
+      - name: work
+        emptyDir: {}
+      - name: dind-sock
+        emptyDir: {}
+      - name: dind-externals
+        emptyDir: {}
