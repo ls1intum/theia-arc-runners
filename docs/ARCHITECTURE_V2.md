@@ -1,60 +1,157 @@
-# Architecture V2: High-Speed Stateless CI (AMD & ARM)
+# Architecture: Stateless CI with Registry Caching
 
 ## Overview
-This architecture transitions the CI runners from a "Docker-in-Docker" (DinD) stateful model to a high-performance **Stateless Kubernetes Mode**. It is designed for two distinct clusters:
-1.  **TheiaProd (AMD)**: General purpose runners.
-2.  **Parma (ARM)**: ARM64 runners for multi-arch builds.
 
-Both clusters are considered **Development Environments**, requiring aggressive image freshness and caching.
+This architecture runs ephemeral GitHub Actions runners with Docker Registry v2 pull-through caches. Runners are stateless (no PVCs) and scale 0-10 based on job demand.
+
+## Clusters
+
+| Cluster | Context | Architecture | Purpose |
+|---------|---------|--------------|---------|
+| theia-prod | `theia-prod` | AMD64 | General CI, multi-arch manifest creation |
+| parma | `parma` | ARM64 | ARM64 image builds |
 
 ## Components
 
-### 1. Spegel (P2P Caching Layer)
-*   **Type**: DaemonSet (Global)
-*   **Function**: Enables peer-to-peer image distribution between nodes.
-*   **Configuration**:
-    *   `containerdSock`: `/run/containerd/containerd.sock`
-    *   `registry.mirror.enabled`: `true`
-    *   Runs on **all nodes** to maximize cache hit rates.
+### 1. Docker Registry v2 Pull-Through Cache
 
-### 2. k8s-digester (Freshness Layer)
-*   **Type**: Deployment + MutatingWebhook
-*   **Function**: Intercepts pod creation and resolves mutable tags (e.g., `:latest`) to immutable SHA digests.
-*   **Scope**: **Global** (All Namespaces), with safety exclusions.
-    *   **Excluded**: `kube-system` (to protect critical cluster components).
-    *   **Included**: `arc-runners`, `default`, and all other dev namespaces.
-*   **Why**: Ensures runners and dev workloads always use the absolute latest image version immediately after a push, preventing stale cache issues.
+Each cluster runs two registry instances:
 
-### 3. Actions Runner Controller (ARC) - Hybrid Mode (Stateless + DinD)
-*   **Type**: Helm Release
-*   **Mode**: Manual Template Configuration (Simulating `kubernetes` mode)
-*   **Function**:
-    *   Controller spawns a "Listener" pod.
-    *   When a job is received, the Listener creates a **new Pod** for that specific job.
-    *   **DinD Sidecar**: Added manually to support `docker build` workflows.
-    *   **Stateless**: Uses `emptyDir` volumes (RAM/Disk) instead of PVCs for speed.
-    *   **Host Execution**: Jobs run on the runner container but communicate with the DinD sidecar via socket.
-    *   **Caching**: DinD sidecar is configured to use Spegel as a registry mirror.
+**Docker Hub Mirror** (`registry-mirror`):
+- Caches pulls from `docker.io`
+- Used by DinD via `--registry-mirror` flag
+- Transparent to `docker pull alpine` commands
 
-## Cluster Specifics
+**GHCR Mirror** (`registry-mirror-ghcr`):
+- Caches pulls from `ghcr.io`
+- Used by BuildKit via registry mirror config
+- Caches base images and build cache layers
 
-### TheiaProd (AMD)
-*   **Context**: `theia-prod`
-*   **Namespaces**: `arc-systems`, `arc-runners`
-*   **Script**: `scripts/deploy-amd.sh`
+**Configuration:**
+- TTL: 720h (30 days) - cached layers live this long
+- Storage: 200Gi per registry
+- Freshness: Tags checked against upstream on every pull
 
-### Parma (ARM)
-*   **Context**: `parma`
-*   **Namespaces**: `arc-systems` (or `parma` - check script), `arc-runners`
-*   **Script**: `scripts/deploy-arm.sh`
-*   **Network**: Now confirmed to have Internet Access.
+### 2. Actions Runner Controller (ARC)
 
-## Deployment Strategy
-1.  **Switch Context**: Target the correct cluster (`kubectl config use-context ...`).
-2.  **Deploy Stack**: Run the respective script to install Spegel -> Digester -> ARC.
-3.  **Verify**: Check Spegel peers, Digester logs, and Runner Listener status.
+**Mode:** Kubernetes mode with manual DinD sidecar
 
-## Usage
-The CI pipelines (in `artemis-theia-blueprints` etc.) target these runners using:
-*   `runs-on: arc-runner-set-stateless` (AMD)
-*   `runs-on: arc-runner-set-arm64` (ARM)
+**Components:**
+- Controller (`arc-systems` namespace): Manages runner lifecycle
+- Listeners: Polls GitHub for jobs
+- Runner pods (`arc-runners` namespace): Ephemeral, created per job
+
+**Runner Pod Structure:**
+```
+┌─────────────────────────────────────────┐
+│ Runner Pod                              │
+├─────────────────────────────────────────┤
+│ init: copy externals                    │
+├──────────────────┬──────────────────────┤
+│ dind container   │ runner container     │
+│ - docker daemon  │ - actions runner     │
+│ - registry-mirror│ - DOCKER_HOST=sock   │
+│ - privileged     │ - runs workflow      │
+└──────────────────┴──────────────────────┘
+        │
+        ▼
+  /var/run/docker.sock (emptyDir)
+```
+
+### 3. Caching Strategy
+
+**Layer 1: Registry Pull-Through Cache**
+- Base images (`node:22`, `alpine`, etc.) cached in-cluster
+- ~2-3s pulls vs 30-60s from internet
+- Shared across all runners
+
+**Layer 2: BuildKit Registry Cache**
+- Build layers pushed to `ghcr.io/{org}/{repo}/build-cache`
+- Persists across runner restarts
+- Per-image, keyed by Dockerfile hash
+
+**Layer 3: BuildKit Mount Cache**
+- `--mount=type=cache` for npm/yarn/pip
+- Lives within single build only (emptyDir)
+- Useful for multi-stage builds
+
+## Network Flow
+
+```
+GitHub ─────────────────────────────────────────┐
+   │                                            │
+   │ Job request                                │
+   ▼                                            │
+┌─────────────────────────────────────────────┐ │
+│ Kubernetes Cluster                          │ │
+│                                             │ │
+│  ┌─────────────┐    ┌─────────────────────┐ │ │
+│  │ ARC         │───▶│ Runner Pod          │ │ │
+│  │ Controller  │    │                     │ │ │
+│  └─────────────┘    │  docker pull alpine │ │ │
+│                     │         │           │ │ │
+│                     │         ▼           │ │ │
+│  ┌─────────────────────────────────────┐  │ │ │
+│  │ registry-mirror (Docker Hub cache)  │  │ │ │
+│  │         │                           │  │ │ │
+│  │    ┌────┴────┐                      │  │ │ │
+│  │  Cache    Upstream                  │  │ │ │
+│  │   HIT      MISS                     │  │ │ │
+│  │    │         │                      │  │ │ │
+│  │    ▼         ▼                      │  │ │ │
+│  │  Return   Fetch ──────────────────────────┼───▶ registry-1.docker.io
+│  │           Cache                     │  │ │ │
+│  │           Return                    │  │ │ │
+│  └─────────────────────────────────────┘  │ │ │
+│                     │                     │ │ │
+│                     ▼                     │ │ │
+│                   Image                   │ │ │
+│                     │                     │ │ │
+│                     ▼                     │ │ │
+│              Workflow step                │◀┘ │
+│                     │                     │   │
+│                     ▼                     │   │
+│              Push to GHCR ────────────────────▶ ghcr.io
+└─────────────────────────────────────────────┘
+```
+
+## Deployment
+
+### AMD64 (theia-prod)
+
+```bash
+kubectl config use-context theia-prod
+./scripts/deploy-amd.sh stateless
+```
+
+### ARM64 (parma)
+
+```bash
+kubectl config use-context parma
+./scripts/deploy-arm.sh arm64
+```
+
+## Verification
+
+```bash
+# Check registry mirrors
+kubectl get pods -n registry-mirror
+
+# Check ARC controller
+kubectl get pods -n arc-systems
+
+# Check runners
+kubectl get pods -n arc-runners
+
+# Test cache hit
+kubectl exec -it deploy/registry-mirror -n registry-mirror -- \
+  wget -qO- http://localhost:5000/v2/_catalog
+```
+
+## Why Not Harbor/Spegel?
+
+**Harbor:** Architecturally incompatible with `--registry-mirror`. Harbor's proxy cache requires explicit project paths (`harbor.example.com/dockerhub/library/alpine`) but `--registry-mirror` expects transparent proxying. Result: every request was a cache miss.
+
+**Spegel:** P2P cache that requires containerd runtime modifications. On RKE2 clusters, this conflicts with embedded-registry feature and caused pod scheduling failures.
+
+**Docker Registry v2:** Simple, lightweight, fully compatible with `--registry-mirror`. Single binary, no complex setup.

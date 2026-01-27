@@ -30,7 +30,8 @@ template:
         args:
           - dockerd
           - --host=unix:///var/run/docker.sock
-          - --group=1001 # Standard runner group ID
+          - --group=1001
+          - --registry-mirror=http://registry-mirror.registry-mirror.svc.cluster.local:5000
         securityContext:
           privileged: true
         volumeMounts:

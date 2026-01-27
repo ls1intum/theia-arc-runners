@@ -1,0 +1,147 @@
+# ==============================================================================
+# Docker Registry v2 - Pull-Through Cache for Docker Hub (Parma Cluster)
+# ==============================================================================
+# ARM64 variant using local-path storage class.
+# Mirrors the theia-prod setup but adapted for Parma's storage infrastructure.
+# ==============================================================================
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: registry-mirror
+  labels:
+    app.kubernetes.io/name: registry-mirror
+    app.kubernetes.io/component: cache
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: registry-config
+  namespace: registry-mirror
+data:
+  config.yml: |
+    version: 0.1
+    log:
+      level: info
+      formatter: json
+    storage:
+      filesystem:
+        rootdirectory: /var/lib/registry
+      cache:
+        blobdescriptor: inmemory
+      delete:
+        enabled: true
+      maintenance:
+        uploadpurging:
+          enabled: true
+          age: 720h
+          interval: 24h
+          dryrun: false
+    http:
+      addr: :5000
+      headers:
+        X-Content-Type-Options: [nosniff]
+    proxy:
+      remoteurl: https://registry-1.docker.io
+      ttl: 720h
+    health:
+      storagedriver:
+        enabled: true
+        interval: 10s
+        threshold: 3
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: registry-data
+  namespace: registry-mirror
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 200Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registry-mirror
+  namespace: registry-mirror
+  labels:
+    app.kubernetes.io/name: registry-mirror
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: registry-mirror
+  strategy:
+    type: Recreate  # Required for RWO PVC
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: registry-mirror
+    spec:
+      containers:
+        - name: registry
+          image: registry:2
+          ports:
+            - containerPort: 5000
+              name: http
+          env:
+            - name: REGISTRY_STORAGE_DELETE_ENABLED
+              value: "true"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/docker/registry
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/registry
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: config
+          configMap:
+            name: registry-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: registry-data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: registry-mirror
+  namespace: registry-mirror
+  labels:
+    app.kubernetes.io/name: registry-mirror
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5000
+      targetPort: 5000
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: registry-mirror

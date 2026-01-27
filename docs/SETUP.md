@@ -1,138 +1,197 @@
 # ARC Runner Setup Guide
 
-This guide describes how to deploy the Actions Runner Controller (ARC) infrastructure with persistent Docker layer caching for `ls1intum` repositories.
+Complete installation guide for deploying GitHub Actions self-hosted runners with registry caching.
 
 ## Prerequisites
 
-1. **Kubernetes Cluster**
-   - Recommended: Same cluster where Theia Cloud runs
-   - Can be Docker Desktop (local), minikube, or a production cluster
-   - Must support PersistentVolumeClaims (PVCs)
+1. **Kubernetes Cluster Access**
+   - `kubectl` configured for target cluster (`theia-prod` or `parma`)
+   - Cluster Admin rights
 
 2. **Tools**
-   - `kubectl` configured for your cluster
-   - `helm` v3.14+ installed
-   - `gh` CLI (optional, for validation)
+   - Helm v3.14+
+   - `kubectl`
 
-3. **Permissions**
-   - Cluster Admin rights (to create namespaces and CRDs)
-   - GitHub Organization Admin rights (to register org-level runners)
+3. **GitHub Token**
+   - Personal Access Token with scopes:
+     - `repo` (Full control of private repositories)
+     - `workflow` (Update GitHub Action workflows)
+     - `admin:org` (Required for org-level runners)
 
-## GitHub Configuration
+## Deployment Steps
 
-### 1. Create Personal Access Token (PAT)
-You need a GitHub PAT to register the runners.
-
-1. Go to [GitHub Settings -> Developer settings -> Personal access tokens](https://github.com/settings/tokens)
-2. Generate new token (classic)
-3. **Scopes Required**:
-   - `repo` (Full control of private repositories)
-   - `workflow` (Update GitHub Action workflows)
-   - `admin:org` (Full control of orgs and teams, read:org) - **Required for org-level runners**
-
-### 2. Configure Environment (Optional but Recommended)
-If deploying via GitHub Actions:
-
-1. Go to this repository's **Settings -> Environments**
-2. Create environment `arc-runners`
-3. Add Secrets:
-   - `KUBECONFIG`: Output of `cat ~/.kube/config`
-   - `GH_PAT`: Your PAT from step 1
-
-## Deployment
-
-### Option 1: Manual Deployment (Script)
-
-The easiest way to deploy from your local machine.
+### 1. Set Context and Token
 
 ```bash
-# 1. Set your PAT
-export GITHUB_PAT="ghp_your_token_here"
+# For AMD64 (theia-prod)
+kubectl config use-context theia-prod
 
-# 2. Run deployment script
-./scripts/deploy.sh all
+# For ARM64 (parma)
+kubectl config use-context parma
+
+# Set your GitHub PAT
+export GITHUB_PAT="ghp_your_token_here"
 ```
 
-This will:
-1. Create namespaces `arc-systems` and `arc-runners`
-2. Install the ARC Controller
-3. Create the GitHub secret
-4. Create 3 PVCs (100Gi each)
-5. Deploy 3 runner scale sets
+### 2. Deploy Registry Mirrors
 
-### Option 2: Step-by-Step Manual Deployment
+Registry mirrors must be deployed first. The script handles this automatically, but for manual deployment:
 
-If you prefer to run commands manually:
+```bash
+# AMD64 cluster
+kubectl apply -f manifests/registry-mirror.yaml
+kubectl apply -f manifests/registry-mirror-ghcr.yaml
+
+# ARM64 cluster
+kubectl apply -f manifests/registry-mirror-parma.yaml
+kubectl apply -f manifests/registry-mirror-ghcr-parma.yaml
+```
+
+Wait for pods to be ready:
+
+```bash
+kubectl get pods -n registry-mirror -w
+```
+
+### 3. Deploy ARC and Runners
+
+```bash
+# AMD64
+./scripts/deploy-amd.sh stateless
+
+# ARM64
+./scripts/deploy-arm.sh arm64
+```
+
+The script will:
+1. Create `arc-systems` and `arc-runners` namespaces
+2. Install/upgrade ARC controller
+3. Deploy RBAC configuration
+4. Create/update GitHub PAT secret
+5. Deploy registry mirrors
+6. Deploy runner scale set
+
+### 4. Verify Deployment
+
+```bash
+# Check ARC controller
+kubectl get pods -n arc-systems
+
+# Check listeners (should show 1 per runner set)
+kubectl get pods -n arc-systems | grep listener
+
+# Check registry mirrors
+kubectl get pods -n registry-mirror
+
+# Check GitHub (should show runner as Idle)
+# Go to: Organization Settings -> Actions -> Runners
+```
+
+## Manual Deployment
+
+If you prefer step-by-step commands:
 
 ```bash
 # 1. Create namespaces
-kubectl create namespace arc-systems
-kubectl create namespace arc-runners
+kubectl create namespace arc-systems --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace arc-runners --dry-run=client -o yaml | kubectl apply -f -
 
 # 2. Install ARC Controller
-helm repo add actions-runner-controller https://actions.github.io/actions-runner-controller
 helm install arc \
   --namespace arc-systems \
   oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller
 
-# 3. Create Secret
+# 3. Wait for controller
+kubectl wait --for=condition=ready pod \
+  -l app.kubernetes.io/name=gha-runner-scale-set-controller \
+  -n arc-systems \
+  --timeout=300s
+
+# 4. Deploy RBAC
+kubectl apply -f manifests/rbac-runner.yaml
+
+# 5. Create GitHub secret
 kubectl create secret generic github-arc-secret \
   --namespace=arc-runners \
-  --from-literal=github_token="YOUR_PAT_HERE"
+  --from-literal=github_token="$GITHUB_PAT" \
+  --dry-run=client -o yaml | kubectl apply -f -
 
-# 4. Create PVCs
-kubectl apply -f manifests/pvc-docker-cache-1.yaml
-kubectl apply -f manifests/pvc-docker-cache-2.yaml
-kubectl apply -f manifests/pvc-docker-cache-3.yaml
+# 6. Deploy registry mirrors
+kubectl apply -f manifests/registry-mirror.yaml
+kubectl apply -f manifests/registry-mirror-ghcr.yaml
 
-# 5. Deploy Runners
-helm install arc-runner-set-1 \
+# 7. Deploy runner set (AMD64 example)
+helm upgrade --install arc-runner-set-stateless \
   --namespace arc-runners \
   oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set \
-  -f manifests/values-runner-set-1.yaml
-
-# (Repeat for runner sets 2 and 3)
+  -f manifests/values-runner-set-stateless.yaml
 ```
 
-## Verification
+## Configuration
 
-### 1. Check Pods
+### Runner Scale Set Values
+
+Key configuration in `values-runner-set-*.yaml`:
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| `minRunners` | 2 | Minimum idle runners |
+| `maxRunners` | 10 | Maximum concurrent runners |
+| `githubConfigUrl` | `https://github.com/ls1intum` | Organization URL |
+| `--registry-mirror` | `http://registry-mirror.registry-mirror.svc.cluster.local:5000` | Docker Hub cache |
+
+### Registry Mirror Settings
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| `proxy.ttl` | 720h | Cached layers live 30 days |
+| `storage` | 200Gi | PVC size per registry |
+| `storageClassName` | `csi-rbd-sc` / `local-path` | Cluster-specific |
+
+## Updating Configuration
+
 ```bash
-# Check Controller
-kubectl get pods -n arc-systems
+# Update runner config
+vim manifests/values-runner-set-stateless.yaml
+helm upgrade arc-runner-set-stateless \
+  --namespace arc-runners \
+  oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set \
+  -f manifests/values-runner-set-stateless.yaml
 
-# Check Listeners (should be 3)
-kubectl get pods -n arc-systems | grep listener
+# Update registry config
+kubectl apply -f manifests/registry-mirror.yaml
+kubectl rollout restart deployment/registry-mirror -n registry-mirror
 ```
 
-### 2. Check PVCs
+## Cleanup
+
 ```bash
-kubectl get pvc -n arc-runners
-# Should show 3 Bound PVCs of 100Gi each
-```
+# Remove runner set
+helm uninstall arc-runner-set-stateless -n arc-runners
 
-### 3. Check GitHub
-Go to **Organization Settings -> Actions -> Runners**. You should see:
-- `arc-runner-set-1` (Idle)
-- `arc-runner-set-2` (Idle)
-- `arc-runner-set-3` (Idle)
-
-## Maintenance
-
-### Updating Configuration
-Modify the values files in `manifests/` and re-run the deployment script:
-```bash
-./scripts/deploy.sh all
-```
-
-### Cleaning Up
-To remove everything:
-```bash
-helm uninstall arc-runner-set-1 -n arc-runners
-helm uninstall arc-runner-set-2 -n arc-runners
-helm uninstall arc-runner-set-3 -n arc-runners
-kubectl delete pvc --all -n arc-runners
+# Remove ARC controller
 helm uninstall arc -n arc-systems
+
+# Remove registry mirrors
+kubectl delete namespace registry-mirror
+
+# Remove namespaces
 kubectl delete namespace arc-runners arc-systems
 ```
-**Warning**: Deleting PVCs will lose the Docker cache!
+
+## Troubleshooting
+
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common issues.
+
+### Quick Checks
+
+```bash
+# Listener not starting?
+kubectl logs -n arc-systems -l app.kubernetes.io/name=gha-runner-scale-set-controller
+
+# Runner pods failing?
+kubectl describe pod -n arc-runners <pod-name>
+
+# Registry cache issues?
+kubectl logs -n registry-mirror deploy/registry-mirror
+```
