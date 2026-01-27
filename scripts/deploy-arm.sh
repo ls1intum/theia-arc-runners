@@ -29,15 +29,28 @@ set -e  # Exit on error
 # ========================================
 # Configuration
 # ========================================
-NAMESPACE_SYSTEMS="parma" # ARM namespace for Systems
-NAMESPACE_RUNNERS="parma" # ARM namespace for Runners
+NAMESPACE_SYSTEMS="arc-systems" # Same namespace as AMD
+NAMESPACE_RUNNERS="arc-runners" # Same namespace as AMD
 RUNNER_SET="${1:-arm64}"
+CLUSTER_NAME="parma"
 
 # Validate runner set parameter
 if [[ ! "$RUNNER_SET" =~ ^(arm64)$ ]]; then
   echo "❌ Error: Invalid runner set '$RUNNER_SET'"
   echo "   Valid options: arm64"
   exit 1
+fi
+
+# Validate Cluster context
+CURRENT_CONTEXT=$(kubectl config current-context)
+if [[ "$CURRENT_CONTEXT" != "$CLUSTER_NAME" ]]; then
+    echo "⚠️ Warning: Current context is '$CURRENT_CONTEXT', expected '$CLUSTER_NAME'."
+    echo "Do you want to proceed? (y/n)"
+    read -r confirm
+    if [[ "$confirm" != "y" ]]; then
+        echo "Aborting."
+        exit 1
+    fi
 fi
 
 echo ""
