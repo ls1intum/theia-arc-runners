@@ -1,0 +1,67 @@
+# ==============================================================================
+# RBAC for ARC Runner (Kubernetes Mode)
+# ==============================================================================
+# Allows the runner pod to spawn worker pods in the same namespace.
+# ==============================================================================
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: arc-runner-set-stateless-sa
+  namespace: arc-runners
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: arc-runner-set-arm64-sa
+  namespace: arc-runners
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: arc-runner-kubernetes-mode-role
+  namespace: arc-runners
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: arc-runner-set-stateless-rb
+  namespace: arc-runners
+subjects:
+  - kind: ServiceAccount
+    name: arc-runner-set-stateless-sa
+    namespace: arc-runners
+roleRef:
+  kind: Role
+  name: arc-runner-kubernetes-mode-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: arc-runner-set-arm64-rb
+  namespace: arc-runners
+subjects:
+  - kind: ServiceAccount
+    name: arc-runner-set-arm64-sa
+    namespace: arc-runners
+roleRef:
+  kind: Role
+  name: arc-runner-kubernetes-mode-role
+  apiGroup: rbac.authorization.k8s.io

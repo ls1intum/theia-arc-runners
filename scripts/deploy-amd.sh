@@ -86,17 +86,17 @@ echo "✅ ARC Controller ready"
 echo ""
 
 # ========================================
-# Step 3: Deploy ConfigMaps (Harbor Mirror)
+# Step 3: Deploy RBAC (Kubernetes Mode)
 # ========================================
-echo "⚙️  Step 3/6: Deploying ConfigMaps..."
+echo "🛡️ Step 3/6: Deploying RBAC for Kubernetes Mode..."
 
 # Create namespace if it doesn't exist
 kubectl create namespace $NAMESPACE_RUNNERS --dry-run=client -o yaml | kubectl apply -f -
 
-# Deploy Harbor Mirror Config (Required for dind runners)
-kubectl apply -f manifests/configmap-dind.yaml
+# Deploy RBAC Role and RoleBinding
+kubectl apply -f manifests/rbac-runner.yaml
 
-echo "✅ ConfigMaps deployed"
+echo "✅ RBAC deployed"
 echo ""
 
 # ========================================

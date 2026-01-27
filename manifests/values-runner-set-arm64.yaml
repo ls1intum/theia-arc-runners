@@ -1,5 +1,5 @@
 # ==============================================================================
-# ARC Runner Scale Set - Stateless (AMD64 / TheiaProd)
+# ARC Runner Scale Set - ARM64 (Parma Cluster)
 # ==============================================================================
 # Architecture V2: Stateless Kubernetes Mode
 # ==============================================================================
@@ -8,7 +8,7 @@ githubConfigUrl: "https://github.com/ls1intum"
 githubConfigSecret: github-arc-secret
 
 minRunners: 2
-maxRunners: 30
+maxRunners: 10
 
 # Container Mode: Kubernetes (Spawns a new pod for each job)
 containerMode:
@@ -22,7 +22,7 @@ containerMode:
 
 template:
   spec:
-    serviceAccountName: arc-runner-set-stateless-sa # Needs RBAC
+    serviceAccountName: arc-runner-set-arm64-sa # Needs RBAC
     containers:
       - name: runner
         image: ghcr.io/actions/actions-runner:latest
