@@ -7,8 +7,8 @@
 githubConfigUrl: "https://github.com/ls1intum"
 githubConfigSecret: github-arc-secret
 
-minRunners: 0
-maxRunners: 10  # Scaled up for parallel execution
+minRunners: 2
+maxRunners: 30
 
 template:
   spec:
@@ -19,6 +19,13 @@ template:
         env:
           - name: DOCKER_HOST
             value: unix:///var/run/docker.sock
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
         volumeMounts:
           - name: work
             mountPath: /home/runner/_work
@@ -30,6 +37,13 @@ template:
         args: ["dockerd", "--host=unix:///var/run/docker.sock", "--group=123"]
         securityContext:
           privileged: true
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 8000m
+            memory: 16Gi
         volumeMounts:
           - name: work
             mountPath: /home/runner/_work
@@ -47,7 +61,7 @@ template:
       - name: dind-sock
         emptyDir: {}
       - name: docker-storage
-        emptyDir: {}  # <--- STATELESS: Lost on restart!
+        emptyDir: {}
       - name: dind-config
         configMap:
           name: dind-daemon-config
