@@ -1,0 +1,143 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: verdaccio
+  labels:
+    app.kubernetes.io/name: verdaccio
+    app.kubernetes.io/component: npm-cache
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: verdaccio-config
+  namespace: verdaccio
+data:
+  config.yaml: |
+    storage: /verdaccio/storage
+    
+    listen: 0.0.0.0:4873
+    
+    uplinks:
+      npmjs:
+        url: https://registry.npmjs.org/
+        cache: true
+        timeout: 30s
+        maxage: 30d
+    
+    packages:
+      '@*/*':
+        access: $all
+        publish: $authenticated
+        proxy: npmjs
+      '**':
+        access: $all
+        publish: $authenticated
+        proxy: npmjs
+    
+    server:
+      keepAliveTimeout: 60
+    
+    middlewares:
+      audit:
+        enabled: true
+    
+    log:
+      type: stdout
+      format: pretty
+      level: info
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: verdaccio-storage
+  namespace: verdaccio
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: verdaccio
+  namespace: verdaccio
+  labels:
+    app.kubernetes.io/name: verdaccio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: verdaccio
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: verdaccio
+    spec:
+      containers:
+        - name: verdaccio
+          image: verdaccio/verdaccio:5
+          ports:
+            - containerPort: 4873
+              name: http
+          env:
+            - name: VERDACCIO_PORT
+              value: "4873"
+          volumeMounts:
+            - name: config
+              mountPath: /verdaccio/conf
+              readOnly: true
+            - name: storage
+              mountPath: /verdaccio/storage
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /-/ping
+              port: 4873
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /-/ping
+              port: 4873
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: verdaccio-config
+        - name: storage
+          persistentVolumeClaim:
+            claimName: verdaccio-storage
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: verdaccio
+  namespace: verdaccio
+  labels:
+    app.kubernetes.io/name: verdaccio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 4873
+      targetPort: 4873
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: verdaccio

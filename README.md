@@ -15,6 +15,7 @@ Infrastructure-as-code for deploying **GitHub Actions self-hosted runners** usin
 
 - Stateless Runner Scale Sets that scale 0-10 runners per cluster
 - Docker Registry v2 pull-through caches for `docker.io` and `ghcr.io`
+- Verdaccio npm registry cache for faster `yarn install` / `npm install`
 - 30-day TTL on cached layers (720h)
 - 200GB cache storage per registry per cluster
 - BuildKit cache layers pushed to `ghcr.io/.../build-cache`
@@ -57,6 +58,22 @@ Each cluster has two Docker Registry v2 instances in `registry-mirror` namespace
 
 The DinD sidecar uses `--registry-mirror` flag to pull through the cache.
 
+### Verdaccio (npm Cache)
+
+Each cluster has a Verdaccio instance in `verdaccio` namespace:
+
+| Service | Upstream | Internal Address |
+|---------|----------|------------------|
+| `verdaccio` | npmjs.org | `http://verdaccio.verdaccio.svc.cluster.local:4873` |
+
+**Usage in Dockerfiles:**
+```dockerfile
+ARG NPM_REGISTRY=https://registry.npmjs.org
+RUN yarn config set registry ${NPM_REGISTRY} && yarn install
+```
+
+Pass `--build-arg NPM_REGISTRY=http://verdaccio.verdaccio.svc.cluster.local:4873` when building on cluster runners.
+
 ### Runner Configuration
 
 Runners use manual DinD sidecar configuration with:
@@ -72,6 +89,8 @@ Runners use manual DinD sidecar configuration with:
 | `registry-mirror-ghcr.yaml` | GHCR cache | theia-prod |
 | `registry-mirror-parma.yaml` | Docker Hub cache | parma |
 | `registry-mirror-ghcr-parma.yaml` | GHCR cache | parma |
+| `verdaccio.yaml` | npm cache | theia-prod |
+| `verdaccio-parma.yaml` | npm cache | parma |
 | `values-runner-set-stateless.yaml` | AMD64 runner config | theia-prod |
 | `values-runner-set-arm64.yaml` | ARM64 runner config | parma |
 | `rbac-runner.yaml` | ServiceAccount for runners | both |
