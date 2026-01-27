@@ -47,26 +47,21 @@ echo ""
 # ========================================
 # Step 1: Deploy Caching Layer (Spegel + Digester)
 # ========================================
-echo "📦 Step 1/7: Deploying Caching Layer (Spegel + Digester)..."
+# Note: Spegel is NOT installed on TheiaProd (RKE2) because RKE2 v1.31+ supports
+# embedded-registry which conflicts with the standalone chart.
+# Also, internet speed is ~740Mbps, so P2P caching is not critical.
+# To enable caching properly, enable 'embedded-registry: true' in RKE2 node config.
 
-# Spegel (P2P Cache) - Safe Mode for RKE2
-# We disable 'containerdMirrorAdd' to prevent Spegel from modifying the host's RKE2 config
-# (which caused issues). Instead, we only use Spegel as a service for the Runners.
-echo "Installing Spegel (Safe Mode)..."
-helm upgrade --install spegel oci://ghcr.io/spegel-org/helm-charts/spegel \
-  --namespace spegel \
-  --create-namespace \
-  --set spegel.containerdMirrorAdd=false \
-  --set spegel.containerdSock="/run/k3s/containerd/containerd.sock" \
-  --set spegel.containerdRegistryConfigPath="/var/lib/rancher/rke2/agent/etc/containerd/certs.d" \
-  --set spegel.containerdContentPath="/var/lib/rancher/rke2/agent/containerd/io.containerd.content.v1.content"
+echo "📦 Step 1/7: Deploying Caching Layer..."
+echo "Skipping Spegel installation on RKE2 (use embedded-registry if needed)."
 
 # k8s-digester (Tag to Digest resolution)
-echo "Installing k8s-digester..."
-kubectl create namespace digester-system --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -f manifests/k8s-digester.yaml
+# Note: Digester is currently disabled as it requires cert-manager/TLS which caused issues.
+# echo "Installing k8s-digester..."
+# kubectl create namespace digester-system --dry-run=client -o yaml | kubectl apply -f -
+# kubectl apply -f manifests/k8s-digester.yaml
 
-echo "✅ Caching Layer deployed"
+echo "✅ Caching Layer skipped (using direct internet pulls)"
 echo ""
 
 # ========================================
