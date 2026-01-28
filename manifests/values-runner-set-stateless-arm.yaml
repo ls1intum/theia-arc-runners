@@ -7,8 +7,8 @@
 githubConfigUrl: "https://github.com/ls1intum"
 githubConfigSecret: github-arc-secret
 
-minRunners: 2
-maxRunners: 10
+minRunners: 5
+maxRunners: 50
 
 template:
   spec:
