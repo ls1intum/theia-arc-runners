@@ -34,19 +34,25 @@ kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=registry-mirror
 echo "Registry mirrors ready"
 echo ""
 
-echo "Step 2/7: Deploying Verdaccio (npm cache)..."
+echo "Step 2/8: Deploying Verdaccio (npm cache)..."
 kubectl apply -f manifests/verdaccio.yaml
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=verdaccio -n verdaccio --timeout=120s
 echo "Verdaccio ready"
 echo ""
 
-echo "Step 3/7: Creating ARC namespaces..."
+echo "Step 3/8: Deploying Apt-Cacher-NG (apt cache)..."
+kubectl apply -f manifests/apt-cacher-ng.yaml
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=apt-cacher-ng -n apt-cacher-ng --timeout=120s
+echo "Apt-Cacher-NG ready"
+echo ""
+
+echo "Step 4/8: Creating ARC namespaces..."
 kubectl create namespace $NAMESPACE_SYSTEMS --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace $NAMESPACE_RUNNERS --dry-run=client -o yaml | kubectl apply -f -
 echo "Namespaces ready"
 echo ""
 
-echo "Step 4/7: Installing ARC Controller..."
+echo "Step 5/8: Installing ARC Controller..."
 if helm list -n $NAMESPACE_SYSTEMS | grep -q "^arc"; then
   helm upgrade arc --namespace $NAMESPACE_SYSTEMS \
     oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller
@@ -60,12 +66,12 @@ kubectl wait --for=condition=ready pod \
 echo "ARC Controller ready"
 echo ""
 
-echo "Step 5/7: Deploying RBAC..."
+echo "Step 6/8: Deploying RBAC..."
 kubectl apply -f manifests/rbac-runner.yaml
 echo "RBAC deployed"
 echo ""
 
-echo "Step 6/7: Creating GitHub PAT secret..."
+echo "Step 7/8: Creating GitHub PAT secret..."
 if [ -z "$GITHUB_PAT" ]; then
   if kubectl get secret github-arc-secret -n $NAMESPACE_RUNNERS &>/dev/null; then
     echo "Secret already exists"
@@ -82,7 +88,7 @@ else
 fi
 echo ""
 
-echo "Step 7/7: Deploying runner scale set..."
+echo "Step 8/8: Deploying runner scale set..."
 helm upgrade --install arc-runner-set-${RUNNER_SET} \
   --namespace $NAMESPACE_RUNNERS \
   oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set \
@@ -99,6 +105,9 @@ kubectl get pods -n registry-mirror
 echo ""
 echo "Verdaccio (npm cache):"
 kubectl get pods -n verdaccio
+echo ""
+echo "Apt-Cacher-NG (apt cache):"
+kubectl get pods -n apt-cacher-ng
 echo ""
 echo "ARC Controller:"
 kubectl get pods -n $NAMESPACE_SYSTEMS -l app.kubernetes.io/name=gha-runner-scale-set-controller
