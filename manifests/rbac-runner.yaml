@@ -16,6 +16,12 @@ metadata:
   name: arc-runner-set-arm64-sa
   namespace: arc-runners
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: arc-runner-set-stateless-arm-sa
+  namespace: arc-runners
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -60,6 +66,20 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: arc-runner-set-arm64-sa
+    namespace: arc-runners
+roleRef:
+  kind: Role
+  name: arc-runner-kubernetes-mode-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: arc-runner-set-stateless-arm-rb
+  namespace: arc-runners
+subjects:
+  - kind: ServiceAccount
+    name: arc-runner-set-stateless-arm-sa
     namespace: arc-runners
 roleRef:
   kind: Role
