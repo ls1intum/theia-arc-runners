@@ -1,0 +1,201 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: squid
+  labels:
+    app.kubernetes.io/name: squid
+    app.kubernetes.io/component: extension-cache
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: squid-config
+  namespace: squid
+data:
+  squid.conf: |
+    http_port 3128
+    http_port 3129 ssl-bump \
+      cert=/etc/squid/ssl/tls.crt \
+      key=/etc/squid/ssl/tls.key \
+      generate-host-certificates=on \
+      dynamic_cert_mem_cache_size=4MB
+
+    sslcrtd_program /usr/lib/squid/security_file_certgen -s /var/spool/squid/ssl_db -M 4MB
+    sslcrtd_children 5
+
+    acl step1 at_step SslBump1
+
+    acl vsix_domains ssl::server_name .vsassets.io
+    acl vsix_domains ssl::server_name .visualstudio.com
+    acl vsix_domains ssl::server_name .open-vsx.org
+
+    ssl_bump peek step1
+    ssl_bump bump vsix_domains
+    ssl_bump splice all
+
+    cache_dir ufs /var/spool/squid 10000 16 256
+    maximum_object_size 512 MB
+    
+    refresh_pattern -i \.vsix$ 10080 100% 43200 ignore-no-cache override-expire override-lastmod
+    refresh_pattern . 0 20% 4320
+
+    acl localnet src 10.0.0.0/8
+    acl localnet src 172.16.0.0/12
+    acl localnet src 192.168.0.0/16
+    acl SSL_ports port 443
+    acl Safe_ports port 80
+    acl Safe_ports port 443
+    acl CONNECT method CONNECT
+
+    http_access deny !Safe_ports
+    http_access deny CONNECT !SSL_ports
+    http_access allow localnet
+    http_access allow localhost
+    http_access deny all
+
+    coredump_dir /var/spool/squid
+    
+    access_log stdio:/dev/stdout
+    cache_log stdio:/dev/stderr
+    cache_store_log none
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: squid
+  namespace: squid
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: squid
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: squid
+    spec:
+      initContainers:
+      - name: init-cache
+        image: fredbcode/squid:latest
+        securityContext:
+          runAsUser: 0
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -ex
+          echo "Initializing Squid cache directories..."
+          echo "Current user: $(id)"
+          
+          rm -rf /var/spool/squid/*
+          rm -rf /var/spool/squid/.*  2>/dev/null || true
+          
+          echo "Volume after cleanup:"
+          ls -la /var/spool/squid/
+          
+          echo "Initializing SSL certificate db..."
+          /usr/lib/squid/security_file_certgen -c -s /var/spool/squid/ssl_db -M 4MB
+          
+          echo "After SSL db init:"
+          ls -la /var/spool/squid/
+          
+          cp /etc/squid-config/squid.conf /etc/squid/squid.conf
+          
+          echo "Initializing cache directories with squid -z..."
+          /usr/sbin/squid -z -N -f /etc/squid/squid.conf
+          
+          chown -R squid:squid /var/spool/squid
+          
+          echo "Final state:"
+          ls -la /var/spool/squid/
+          echo "Squid cache initialization complete"
+        volumeMounts:
+        - name: cache
+          mountPath: /var/spool/squid
+        - name: config
+          mountPath: /etc/squid-config/squid.conf
+          subPath: squid.conf
+        - name: ssl-cert
+          mountPath: /etc/squid/ssl
+          readOnly: true
+      containers:
+      - name: squid
+        image: fredbcode/squid:latest
+        command: ["/usr/sbin/squid", "-N", "-f", "/etc/squid/squid.conf"]
+        ports:
+        - containerPort: 3128
+          name: http
+        - containerPort: 3129
+          name: https
+        volumeMounts:
+        - name: config
+          mountPath: /etc/squid/squid.conf
+          subPath: squid.conf
+        - name: ssl-cert
+          mountPath: /etc/squid/ssl
+          readOnly: true
+        - name: cache
+          mountPath: /var/spool/squid
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          tcpSocket:
+            port: 3128
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          tcpSocket:
+            port: 3128
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: config
+        configMap:
+          name: squid-config
+      - name: ssl-cert
+        secret:
+          secretName: squid-ca-cert
+      - name: cache
+        persistentVolumeClaim:
+          claimName: squid-pvc
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: squid-pvc
+  namespace: squid
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: local-path
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: squid
+  namespace: squid
+spec:
+  type: ClusterIP
+  selector:
+    app: squid
+  ports:
+  - name: http
+    port: 3128
+    targetPort: 3128
+  - name: https-proxy
+    port: 3129
+    targetPort: 3129
