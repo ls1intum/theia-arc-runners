@@ -26,10 +26,12 @@ data:
 
     acl step1 at_step SslBump1
 
-    # VS Code extension domains for SSL bump
+    # VS Code extension domains for SSL bump (including CDN redirects)
     acl vsix_domains ssl::server_name .vsassets.io
     acl vsix_domains ssl::server_name .visualstudio.com
     acl vsix_domains ssl::server_name .open-vsx.org
+    acl vsix_domains ssl::server_name open-vsx.org
+    acl vsix_domains ssl::server_name .eclipsecontent.org
 
     ssl_bump peek step1
     ssl_bump bump vsix_domains
