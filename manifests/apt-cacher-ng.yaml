@@ -43,7 +43,7 @@ spec:
     spec:
       containers:
         - name: apt-cacher-ng
-          image: sameersbn/apt-cacher-ng:3.7.4-20220421
+          image: mbentley/apt-cacher-ng:latest
           ports:
             - containerPort: 3142
               name: http

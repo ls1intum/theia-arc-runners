@@ -40,8 +40,12 @@ data:
     cache_dir ufs /var/spool/squid 10000 16 256
     maximum_object_size 512 MB
     
-    # Cache VSIX files aggressively
+    # Cache VSIX files aggressively (7 days min, 30 days max)
     refresh_pattern -i \.vsix$ 10080 100% 43200 ignore-no-cache override-expire override-lastmod
+    # Cache open-vsx API responses (60 min min, 1 day max) - versions don't change often
+    refresh_pattern -i open-vsx\.org/api 60 50% 1440 override-expire
+    refresh_pattern -i eclipsecontent\.org 10080 100% 43200 override-expire
+    # Default: check freshness more often
     refresh_pattern . 0 20% 4320
 
     acl localnet src 10.0.0.0/8

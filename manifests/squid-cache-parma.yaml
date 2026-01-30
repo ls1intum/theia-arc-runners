@@ -40,6 +40,8 @@ data:
     maximum_object_size 512 MB
     
     refresh_pattern -i \.vsix$ 10080 100% 43200 ignore-no-cache override-expire override-lastmod
+    refresh_pattern -i open-vsx\.org/api 60 50% 1440 override-expire
+    refresh_pattern -i eclipsecontent\.org 10080 100% 43200 override-expire
     refresh_pattern . 0 20% 4320
 
     acl localnet src 10.0.0.0/8
