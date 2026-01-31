@@ -3,13 +3,8 @@ set -e
 
 NAMESPACE_SYSTEMS="arc-systems"
 NAMESPACE_RUNNERS="arc-runners"
-RUNNER_SET="${1:-stateless}"
+RUNNER_SET="stateless"
 CLUSTER_NAME="theia-prod"
-
-if [[ ! "$RUNNER_SET" =~ ^(stateless)$ ]]; then
-  echo "Error: Invalid runner set '$RUNNER_SET'. Valid: stateless"
-  exit 1
-fi
 
 CURRENT_CONTEXT=$(kubectl config current-context)
 if [[ "$CURRENT_CONTEXT" != "$CLUSTER_NAME" ]]; then
@@ -46,13 +41,19 @@ kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=apt-cacher-ng -
 echo "Apt-Cacher-NG ready"
 echo ""
 
-echo "Step 4/8: Creating ARC namespaces..."
+echo "Step 4/9: Deploying Squid (HTTPS cache with SSL bumping)..."
+kubectl apply -f manifests/squid-cache.yaml
+kubectl wait --for=condition=ready pod -l app=squid -n squid --timeout=120s
+echo "Squid ready"
+echo ""
+
+echo "Step 5/9: Creating ARC namespaces..."
 kubectl create namespace $NAMESPACE_SYSTEMS --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace $NAMESPACE_RUNNERS --dry-run=client -o yaml | kubectl apply -f -
 echo "Namespaces ready"
 echo ""
 
-echo "Step 5/8: Installing ARC Controller..."
+echo "Step 6/9: Installing ARC Controller..."
 if helm list -n $NAMESPACE_SYSTEMS | grep -q "^arc"; then
   helm upgrade arc --namespace $NAMESPACE_SYSTEMS \
     oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller
@@ -66,12 +67,12 @@ kubectl wait --for=condition=ready pod \
 echo "ARC Controller ready"
 echo ""
 
-echo "Step 6/8: Deploying RBAC..."
+echo "Step 7/9: Deploying RBAC..."
 kubectl apply -f manifests/rbac-runner.yaml
 echo "RBAC deployed"
 echo ""
 
-echo "Step 7/8: Creating GitHub PAT secret..."
+echo "Step 8/9: Creating GitHub PAT secret..."
 if [ -z "$GITHUB_PAT" ]; then
   if kubectl get secret github-arc-secret -n $NAMESPACE_RUNNERS &>/dev/null; then
     echo "Secret already exists"
@@ -88,7 +89,7 @@ else
 fi
 echo ""
 
-echo "Step 8/8: Deploying runner scale set..."
+echo "Step 9/9: Deploying runner scale set..."
 helm upgrade --install arc-runner-set-${RUNNER_SET} \
   --namespace $NAMESPACE_RUNNERS \
   oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set \
@@ -108,6 +109,9 @@ kubectl get pods -n verdaccio
 echo ""
 echo "Apt-Cacher-NG (apt cache):"
 kubectl get pods -n apt-cacher-ng
+echo ""
+echo "Squid (HTTPS cache):"
+kubectl get pods -n squid
 echo ""
 echo "ARC Controller:"
 kubectl get pods -n $NAMESPACE_SYSTEMS -l app.kubernetes.io/name=gha-runner-scale-set-controller
