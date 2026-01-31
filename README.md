@@ -13,7 +13,7 @@ Infrastructure-as-code for deploying **GitHub Actions self-hosted runners** usin
 
 ## Features
 
-- Stateless Runner Scale Sets that scale 5-50 runners per cluster
+- Stateless Runner Scale Sets that scale 10-50 runners per cluster
 - Docker Registry v2 pull-through caches for `docker.io` and `ghcr.io`
 - Verdaccio npm registry cache for faster `yarn install` / `npm install`
 - apt-cacher-ng for Ubuntu package caching
