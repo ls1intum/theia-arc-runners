@@ -29,7 +29,32 @@ Infrastructure-as-code for deploying **GitHub Actions self-hosted runners** usin
 
 - `kubectl` configured for target cluster
 - Helm 3.14+
+- `openssl` for generating CA certificates
 - `GITHUB_PAT` environment variable (org admin token)
+
+### One-Time Setup: Squid CA Certificate
+
+Before deploying the Squid proxy for the first time on a cluster, you must generate a self-signed CA certificate for SSL bumping. This certificate is used to intercept and cache HTTPS traffic.
+
+**For theia-prod cluster:**
+```bash
+kubectl config use-context theia-prod
+./scripts/setup-squid-ca.sh
+```
+
+**For parma cluster:**
+```bash
+kubectl config use-context parma
+./scripts/setup-squid-ca.sh
+```
+
+**What it does:**
+- Creates the `squid` namespace if it doesn't exist
+- Generates a self-signed CA certificate (valid for 10 years)
+- Stores the certificate and key in a Kubernetes secret (`squid-ca-cert`)
+- Automatically cleans up temporary files
+
+**Note:** This only needs to be run once per cluster. The script will skip certificate generation if the secret already exists.
 
 ### Deploy AMD64 Runners (theia-prod)
 
@@ -146,6 +171,59 @@ Runners use manual DinD sidecar configuration with:
 - [Architecture](docs/ARCHITECTURE_V2.md) - System design and caching strategy
 - [Setup Guide](docs/SETUP.md) - Detailed installation instructions
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
+
+## Cleanup and Maintenance
+
+### Removing Orphaned Resources
+
+After removing or renaming AutoScalingRunnerSets, some resources may be left behind. Here's how to identify and clean them up:
+
+**1. Check for orphaned AutoScalingRunnerSets:**
+```bash
+kubectl get autoscalingrunnersets -n arc-runners
+```
+
+**2. Check for orphaned service accounts:**
+```bash
+# List all service accounts
+kubectl get serviceaccounts -n arc-runners
+
+# Check which service accounts are actively in use
+kubectl get pods -n arc-runners -o jsonpath='{range .items[*]}{.spec.serviceAccountName}{"\n"}{end}' | sort -u
+```
+
+**3. Delete orphaned resources:**
+```bash
+# Delete AutoScalingRunnerSet (will terminate associated pods)
+kubectl delete autoscalingrunnersets <old-runner-set-name> -n arc-runners
+
+# Wait for pods to terminate, then delete service account
+kubectl delete serviceaccount <old-service-account-name> -n arc-runners
+```
+
+**Common orphaned resources:**
+- `arc-runner-set-arm64` and `arc-runner-set-arm64-sa` - Old ARM64 runner set (replaced by `arc-runner-set-stateless-arm`)
+- Service accounts on the wrong cluster (e.g., ARM64 SA on AMD64 cluster)
+
+### Verifying Active Infrastructure
+
+**Check active runners on theia-prod:**
+```bash
+kubectl config use-context theia-prod
+kubectl get autoscalingrunnersets -n arc-runners
+kubectl get pods -n arc-runners
+```
+
+**Check active runners on parma:**
+```bash
+kubectl config use-context parma
+kubectl get autoscalingrunnersets -n arc-runners
+kubectl get pods -n arc-runners
+```
+
+Expected AutoScalingRunnerSets:
+- `theia-prod`: `arc-runner-set-stateless`
+- `parma`: `arc-runner-set-stateless-arm`
 
 ## Related Projects
 
