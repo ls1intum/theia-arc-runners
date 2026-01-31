@@ -7,7 +7,7 @@
 githubConfigUrl: "https://github.com/ls1intum"
 githubConfigSecret: github-arc-secret
 
-minRunners: 5
+minRunners: 10
 maxRunners: 50
 
 # We use manual configuration to set up a Docker-in-Docker (DinD) environment.
