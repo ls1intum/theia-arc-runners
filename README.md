@@ -19,7 +19,8 @@ Infrastructure-as-code for deploying **GitHub Actions self-hosted runners** usin
 - apt-cacher-ng for Ubuntu package caching
 - Squid proxy with SSL bumping for HTTPS caching (VSCode extensions)
 - 30-day TTL on cached layers (720h)
-- 200GB cache storage per registry per cluster
+- Cache storage: parma (50GB ghcr, 10GB dockerhub, 5GB npm, 10GB apt), theia-prod (200GB per registry)
+- Memory-backed build cache on parma (30GB per runner, ~1000x faster than disk)
 - BuildKit cache layers pushed to `ghcr.io/.../build-cache`
 - Organization-wide runners for `ls1intum` repositories
 
