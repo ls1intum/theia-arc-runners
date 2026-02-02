@@ -44,6 +44,11 @@ spec:
       containers:
         - name: apt-cacher-ng
           image: mbentley/apt-cacher-ng:latest
+          env:
+            - name: PUID
+              value: "100"
+            - name: PGID
+              value: "101"
           ports:
             - containerPort: 3142
               name: http
