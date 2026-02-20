@@ -1,0 +1,61 @@
+# ==============================================================================
+# Garbage Collection CronJob for GHCR Registry Mirror (parma)
+# ==============================================================================
+# Runs weekly garbage collection to clean up orphaned layers and prevent
+# blob corruption. Registry is put in read-only mode during GC to prevent
+# race conditions.
+#
+# Schedule: Every Sunday at 3:00 AM
+# ==============================================================================
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: registry-ghcr-gc
+  namespace: registry-mirror
+  labels:
+    app.kubernetes.io/name: registry-mirror-ghcr
+    app.kubernetes.io/component: garbage-collection
+spec:
+  schedule: "0 3 * * 0"  # Every Sunday at 3 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: registry-mirror-ghcr
+            app.kubernetes.io/component: garbage-collection
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: gc
+            image: registry:2
+            command:
+            - /bin/registry
+            - garbage-collect
+            - /etc/docker/registry/config.yml
+            - --delete-untagged=true
+            volumeMounts:
+            - name: config
+              mountPath: /etc/docker/registry
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/registry
+            resources:
+              requests:
+                cpu: 200m
+                memory: 512Mi
+              limits:
+                cpu: 1000m
+                memory: 2Gi
+          volumes:
+          - name: config
+            configMap:
+              name: registry-ghcr-config
+          - name: data
+            persistentVolumeClaim:
+              claimName: registry-ghcr-data

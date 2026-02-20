@@ -36,16 +36,26 @@ data:
       maintenance:
         uploadpurging:
           enabled: true
-          age: 720h
+          age: 168h
           interval: 24h
           dryrun: false
     http:
       addr: :5000
       headers:
         X-Content-Type-Options: [nosniff]
+      timeout:
+        read: 120s
+        write: 120s
+        idle: 120s
     proxy:
       remoteurl: https://registry-1.docker.io
-      ttl: 720h
+      ttl: 168h
+    validation:
+      enabled: true
+      manifests:
+        urls:
+          allow:
+            - ^https?://
     health:
       storagedriver:
         enabled: true
@@ -103,11 +113,11 @@ spec:
               mountPath: /var/lib/registry
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: 500m
+              memory: 2Gi
             limits:
-              cpu: 1000m
-              memory: 1Gi
+              cpu: 2000m
+              memory: 10Gi
           livenessProbe:
             httpGet:
               path: /
