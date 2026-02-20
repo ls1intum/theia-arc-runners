@@ -1,0 +1,110 @@
+{{- if .Values.aptCacher.enabled }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apt-cacher-ng
+  labels:
+    helm.sh/chart: {{ include "build-caches.chart" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: apt-cacher-ng
+    app.kubernetes.io/component: apt-cache
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: apt-cacher-ng-storage
+  namespace: apt-cacher-ng
+  labels:
+    helm.sh/chart: {{ include "build-caches.chart" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: apt-cacher-ng
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.aptCacher.storageClass | default .Values.global.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.aptCacher.pvcSize | quote }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apt-cacher-ng
+  namespace: apt-cacher-ng
+  labels:
+    helm.sh/chart: {{ include "build-caches.chart" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: apt-cacher-ng
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: apt-cacher-ng
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: apt-cacher-ng
+    spec:
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: apt-cacher-ng
+          image: mbentley/apt-cacher-ng:latest
+          env:
+            - name: PUID
+              value: "100"
+            - name: PGID
+              value: "101"
+          ports:
+            - containerPort: 3142
+              name: http
+          volumeMounts:
+            - name: storage
+              mountPath: /var/cache/apt-cacher-ng
+          resources:
+            {{- toYaml .Values.aptCacher.resources | nindent 12 }}
+          livenessProbe:
+            tcpSocket:
+              port: 3142
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: 3142
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: apt-cacher-ng-storage
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apt-cacher-ng
+  namespace: apt-cacher-ng
+  labels:
+    helm.sh/chart: {{ include "build-caches.chart" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: apt-cacher-ng
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3142
+      targetPort: 3142
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: apt-cacher-ng
+{{- end }}

@@ -1,0 +1,118 @@
+========================================
+  Theia ARC Bundle - Installation Complete
+========================================
+
+This Helm chart has deployed the following components:
+
+{{ if .Values.buildCaches.enabled -}}
+BUILD CACHES:
+  - Docker Registry Mirror (Docker Hub): registry-mirror.registry-mirror.svc.cluster.local:5000
+  - Docker Registry Mirror (GHCR): registry-mirror-ghcr.registry-mirror.svc.cluster.local:5000
+  - Verdaccio (npm): verdaccio.verdaccio.svc.cluster.local:4873
+  - Apt-Cacher-NG: apt-cacher-ng.apt-cacher-ng.svc.cluster.local:3142
+  - Squid Proxy: squid.squid.svc.cluster.local:3128
+{{- end }}
+
+{{ if .Values.arcController.enabled -}}
+ARC CONTROLLER:
+  - Namespace: arc-systems
+  - Status: kubectl get pods -n arc-systems
+{{- end }}
+
+{{ if .Values.arcRunners.enabled -}}
+ARC RUNNERS (AMD64):
+  - Scale Set: {{ .Values.arcRunners.runnerScaleSetName }}
+  - Min Runners: {{ .Values.arcRunners.minRunners }}
+  - Max Runners: {{ .Values.arcRunners.maxRunners }}
+  - GitHub Org: {{ .Values.arcRunners.githubConfigUrl }}
+{{- end }}
+
+{{ if .Values.arcRunnersArm.enabled -}}
+ARC RUNNERS (ARM64):
+  - Scale Set: {{ .Values.arcRunnersArm.runnerScaleSetName }}
+  - Min Runners: {{ .Values.arcRunnersArm.minRunners }}
+  - Max Runners: {{ .Values.arcRunnersArm.maxRunners }}
+  - GitHub Org: {{ .Values.arcRunnersArm.githubConfigUrl }}
+{{- end }}
+
+========================================
+PREREQUISITES CHECK
+========================================
+
+Before runners can function, ensure these secrets exist:
+
+1. GitHub PAT Secret:
+   kubectl get secret github-arc-secret -n arc-runners
+
+   If missing, create it:
+   kubectl create secret generic github-arc-secret \
+     --namespace=arc-runners \
+     --from-literal=github_token="YOUR_GITHUB_PAT"
+
+{{ if .Values.buildCaches.enabled -}}
+2. Squid CA Certificate:
+   kubectl get secret {{ .Values.buildCaches.squid.caSecretName }} -n squid
+
+   If missing, generate it:
+   ./scripts/setup-squid-ca.sh
+{{- end }}
+
+========================================
+VERIFICATION COMMANDS
+========================================
+
+Check all pods:
+  kubectl get pods --all-namespaces | grep -E "(registry|verdaccio|apt|squid|arc)"
+
+Check runner scale sets:
+  kubectl get autoscalingrunnersets -n arc-runners
+
+View controller logs:
+  kubectl logs -n arc-systems -l app.kubernetes.io/name=gha-runner-scale-set-controller --tail=50
+
+Test cache connectivity (from within cluster):
+  kubectl run test-caches --image=alpine --rm -it --restart=Never -- sh
+  # Inside pod:
+  nc -zv registry-mirror.registry-mirror.svc.cluster.local 5000
+  nc -zv verdaccio.verdaccio.svc.cluster.local 4873
+  nc -zv squid.squid.svc.cluster.local 3128
+
+========================================
+UPGRADE / ROLLBACK
+========================================
+
+Upgrade this release:
+  helm upgrade {{ .Release.Name }} . --namespace {{ .Release.Namespace }} --wait
+
+Rollback to previous version:
+  helm rollback {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+View release history:
+  helm history {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+========================================
+TROUBLESHOOTING
+========================================
+
+If runners fail to start:
+  1. Check init container logs (wait-for-caches):
+     kubectl logs -n arc-runners <runner-pod> -c wait-for-caches
+
+  2. Verify cache services are running:
+     kubectl get pods -n registry-mirror
+     kubectl get pods -n verdaccio
+     kubectl get pods -n squid
+
+  3. Check RBAC permissions:
+     kubectl get sa -n arc-runners
+     kubectl get role,rolebinding -n arc-runners
+
+If workflows don't trigger runners:
+  1. Verify GitHub PAT secret exists and is valid
+  2. Check listener pod logs:
+     kubectl logs -n arc-systems -l app.kubernetes.io/name=gha-runner-scale-set-controller
+  3. Confirm GitHub org URL matches: {{ .Values.arcRunners.githubConfigUrl }}
+
+For more help:
+  Repository: https://github.com/ls1intum/theia-arc-runners
+  Docs: helm-chart/theia-arc-bundle/README.md

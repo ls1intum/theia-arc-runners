@@ -1,0 +1,218 @@
+global:
+  storageClass: "csi-rbd-sc"
+  nodeSelector:
+    kubernetes.io/arch: amd64
+  tolerations: []
+
+buildCaches:
+  enabled: true
+  dockerMirror:
+    pvcSize: "200Gi"
+  ghcrMirror:
+    pvcSize: "200Gi"
+  verdaccio:
+    pvcSize: "50Gi"
+  aptCacher:
+    pvcSize: "50Gi"
+  squid:
+    pvcSize: "20Gi"
+    caSecretName: "squid-ca-cert"
+
+arcController:
+  enabled: true
+
+arcRunners:
+  enabled: true
+  githubConfigUrl: "https://github.com/ls1intum"
+  githubConfigSecret: "github-arc-secret"
+  minRunners: 10
+  maxRunners: 50
+  runnerScaleSetName: "arc-runner-set-stateless"
+  controllerServiceAccount:
+    namespace: arc-systems
+    name: gha-rs-controller
+  template:
+    spec:
+      serviceAccountName: arc-runner-set-stateless-sa
+      initContainers:
+        - name: wait-for-caches
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for cache services..."
+              until nc -z registry-mirror.registry-mirror.svc.cluster.local 5000; do
+                echo "Waiting for Docker mirror..."
+                sleep 2
+              done
+              until nc -z registry-mirror-ghcr.registry-mirror.svc.cluster.local 5000; do
+                echo "Waiting for GHCR mirror..."
+                sleep 2
+              done
+              until nc -z verdaccio.verdaccio.svc.cluster.local 4873; do
+                echo "Waiting for Verdaccio..."
+                sleep 2
+              done
+              until nc -z apt-cacher-ng.apt-cacher-ng.svc.cluster.local 3142; do
+                echo "Waiting for apt-cacher-ng..."
+                sleep 2
+              done
+              until nc -z squid.squid.svc.cluster.local 3128; do
+                echo "Waiting for Squid..."
+                sleep 2
+              done
+              echo "All cache services ready!"
+        - name: init-dind-externals
+          image: ghcr.io/actions/actions-runner:latest
+          command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
+          volumeMounts:
+            - name: dind-externals
+              mountPath: /home/runner/tmpDir
+      containers:
+        - name: dind
+          image: docker:dind
+          args:
+            - dockerd
+            - --host=unix:///var/run/docker.sock
+            - --group=1001
+            - --registry-mirror=http://registry-mirror.registry-mirror.svc.cluster.local:5000
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: work
+              mountPath: /home/runner/_work
+            - name: dind-sock
+              mountPath: /var/run
+            - name: dind-externals
+              mountPath: /home/runner/externals
+        - name: runner
+          image: ghcr.io/actions/actions-runner:latest
+          command: ["/home/runner/run.sh"]
+          env:
+            - name: DOCKER_HOST
+              value: unix:///var/run/docker.sock
+            - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
+              value: "false"
+          volumeMounts:
+            - name: work
+              mountPath: /home/runner/_work
+            - name: dind-sock
+              mountPath: /var/run
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 4000m
+              memory: 8Gi
+      volumes:
+        - name: work
+          emptyDir: {}
+        - name: dind-sock
+          emptyDir: {}
+        - name: dind-externals
+          emptyDir: {}
+
+arcRunnersArm:
+  enabled: false
+  githubConfigUrl: "https://github.com/ls1intum"
+  githubConfigSecret: "github-arc-secret"
+  minRunners: 10
+  maxRunners: 50
+  runnerScaleSetName: "arc-runner-set-stateless-arm"
+  controllerServiceAccount:
+    namespace: arc-systems
+    name: gha-rs-controller
+  template:
+    spec:
+      serviceAccountName: arc-runner-set-stateless-arm-sa
+      initContainers:
+        - name: wait-for-caches
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for cache services..."
+              until nc -z registry-mirror.registry-mirror.svc.cluster.local 5000; do
+                echo "Waiting for Docker mirror..."
+                sleep 2
+              done
+              until nc -z registry-mirror-ghcr.registry-mirror.svc.cluster.local 5000; do
+                echo "Waiting for GHCR mirror..."
+                sleep 2
+              done
+              until nc -z verdaccio.verdaccio.svc.cluster.local 4873; do
+                echo "Waiting for Verdaccio..."
+                sleep 2
+              done
+              until nc -z apt-cacher-ng.apt-cacher-ng.svc.cluster.local 3142; do
+                echo "Waiting for apt-cacher-ng..."
+                sleep 2
+              done
+              until nc -z squid.squid.svc.cluster.local 3128; do
+                echo "Waiting for Squid..."
+                sleep 2
+              done
+              echo "All cache services ready!"
+        - name: init-dind-externals
+          image: ghcr.io/actions/actions-runner:latest
+          command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
+          volumeMounts:
+            - name: dind-externals
+              mountPath: /home/runner/tmpDir
+      containers:
+        - name: dind
+          image: docker:dind
+          args:
+            - dockerd
+            - --host=unix:///var/run/docker.sock
+            - --group=1001
+            - --registry-mirror=http://registry-mirror.registry-mirror.svc.cluster.local:5000
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: work
+              mountPath: /home/runner/_work
+            - name: dind-sock
+              mountPath: /var/run
+            - name: dind-externals
+              mountPath: /home/runner/externals
+        - name: runner
+          image: ghcr.io/actions/actions-runner:latest
+          command: ["/home/runner/run.sh"]
+          env:
+            - name: DOCKER_HOST
+              value: unix:///var/run/docker.sock
+            - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
+              value: "false"
+          volumeMounts:
+            - name: work
+              mountPath: /home/runner/_work
+            - name: dind-sock
+              mountPath: /var/run
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 4000m
+              memory: 8Gi
+      volumes:
+        - name: work
+          emptyDir:
+            medium: Memory
+            sizeLimit: 30Gi
+        - name: dind-sock
+          emptyDir: {}
+        - name: dind-externals
+          emptyDir: {}
+
+externalSecrets:
+  enabled: false
+  secretStore: "vault-backend"
+  githubPat:
+    remoteRef:
+      key: "github/actions-pat"
+      property: "token"

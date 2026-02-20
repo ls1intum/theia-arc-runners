@@ -1,0 +1,40 @@
+# ARM64-specific values for parma cluster
+# Usage: helm install/upgrade ... -f values.yaml -f values-arm64.yaml
+
+global:
+  storageClass: "local-path"
+  nodeSelector:
+    kubernetes.io/arch: arm64
+
+buildCaches:
+  enabled: true
+  dockerMirror:
+    pvcSize: "10Gi"
+  ghcrMirror:
+    pvcSize: "50Gi"
+  verdaccio:
+    pvcSize: "5Gi"
+  aptCacher:
+    pvcSize: "10Gi"
+  squid:
+    pvcSize: "5Gi"
+
+# Disable AMD64 runners
+arcRunners:
+  enabled: false
+
+# Enable ARM64 runners
+arcRunnersArm:
+  enabled: true
+  # Memory-backed work volume for ARM (faster builds on constrained hardware)
+  template:
+    spec:
+      volumes:
+        - name: work
+          emptyDir:
+            medium: Memory
+            sizeLimit: 30Gi
+        - name: dind-sock
+          emptyDir: {}
+        - name: dind-externals
+          emptyDir: {}
