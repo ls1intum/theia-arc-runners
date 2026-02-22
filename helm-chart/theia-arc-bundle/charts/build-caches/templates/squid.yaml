@@ -92,6 +92,10 @@ spec:
       labels:
         app: squid
     spec:
+      securityContext:
+        fsGroup: 1161
+        runAsUser: 1161
+        runAsNonRoot: true
       {{- with .Values.global.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -103,8 +107,6 @@ spec:
       initContainers:
       - name: init-cache
         image: fredbcode/squid:latest
-        securityContext:
-          runAsUser: 0
         command:
         - /bin/sh
         - -c
@@ -129,8 +131,6 @@ spec:
           
           echo "Initializing cache directories with squid -z..."
           /usr/sbin/squid -z -N -f /etc/squid/squid.conf
-          
-          chown -R squid:squid /var/spool/squid
           
           echo "Final state:"
           ls -la /var/spool/squid/
