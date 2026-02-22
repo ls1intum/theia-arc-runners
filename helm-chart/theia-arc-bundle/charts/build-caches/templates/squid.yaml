@@ -10,6 +10,48 @@ metadata:
     app.kubernetes.io/component: extension-cache
 
 ---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: squid-selfsigned-issuer
+  namespace: squid
+  labels:
+    helm.sh/chart: {{ include "build-caches.chart" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: squid
+spec:
+  selfSigned: {}
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: squid-ca-cert
+  namespace: squid
+  labels:
+    helm.sh/chart: {{ include "build-caches.chart" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: squid
+spec:
+  isCA: true
+  commonName: "Squid CA"
+  subject:
+    organizations:
+      - Theia
+    countries:
+      - DE
+  duration: 87600h
+  renewBefore: 720h
+  secretName: {{ .Values.squid.caSecretName }}
+  privateKey:
+    algorithm: RSA
+    size: 4096
+  issuerRef:
+    name: squid-selfsigned-issuer
+    kind: Issuer
+    group: cert-manager.io
+
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
