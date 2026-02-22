@@ -1,3 +1,4 @@
+{{- if or .Values.arcRunners.enabled .Values.arcRunnersArm.enabled }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -69,3 +70,4 @@ roleRef:
   kind: Role
   name: arc-runner-kubernetes-mode-role
   apiGroup: rbac.authorization.k8s.io
+{{- end }}

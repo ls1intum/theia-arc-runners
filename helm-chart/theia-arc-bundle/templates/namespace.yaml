@@ -1,9 +1,12 @@
+{{- if .Values.arcController.enabled }}
 apiVersion: v1
 kind: Namespace
 metadata:
   name: arc-systems
   labels:
     {{- include "theia-arc-bundle.labels" . | nindent 4 }}
+{{- end }}
+{{- if or .Values.arcRunners.enabled .Values.arcRunnersArm.enabled }}
 ---
 apiVersion: v1
 kind: Namespace
@@ -11,3 +14,4 @@ metadata:
   name: arc-runners
   labels:
     {{- include "theia-arc-bundle.labels" . | nindent 4 }}
+{{- end }}
