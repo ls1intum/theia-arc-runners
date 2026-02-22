@@ -46,6 +46,7 @@ spec:
   privateKey:
     algorithm: RSA
     size: 4096
+    rotationPolicy: Never
   issuerRef:
     name: squid-selfsigned-issuer
     kind: Issuer
