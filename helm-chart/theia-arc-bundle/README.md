@@ -85,7 +85,7 @@ helm install theia-arc-systems . \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
   --wait \
-  --timeout 10m
+  --timeout 2m
 ```
 
 Verify the controller is running before proceeding:
@@ -105,7 +105,7 @@ helm install theia-arc-runners . \
   --set arcController.enabled=false \
   --set arcRunners.enabled=true \
   --wait \
-  --timeout 10m
+  --timeout 2m
 ```
 
 ### Step 4: Verify
@@ -156,28 +156,51 @@ kubectl get secret squid-ca-cert -n squid
 
 ## ARM64 Cluster (parma)
 
-Use `values-arm64.yaml` as an overlay. It sets `storageClass: local-path`, `nodeSelector: arm64`, smaller PVC sizes, and disables cert-manager (`"build-caches".squid.certManager.enabled: false`) since parma has no cert-manager installed. Create the Squid CA secret manually first — see [Manual Squid CA](#squid-ca--manual-setup-without-cert-manager).
+Use `values-arm64.yaml` as an overlay. It sets `storageClass: local-path`, `nodeSelector: arm64`, smaller PVC sizes, and disables cert-manager (`"build-caches".squid.certManager.enabled: false`) since parma has no cert-manager installed.
 
-The two-step process is otherwise identical:
+### Step 0: Create the Squid CA secret manually
+
+parma has no cert-manager, so the Squid CA must be pre-created before Part 1. See [Manual Squid CA](#squid-ca--manual-setup-without-cert-manager) for the full procedure. The `squid` namespace created there will be adopted by the subchart during Part 1 — you must annotate it so Helm can take ownership:
 
 ```bash
-# Part 1
+kubectl --context=parma label namespace squid app.kubernetes.io/managed-by=Helm
+kubectl --context=parma annotate namespace squid \
+  meta.helm.sh/release-name=theia-arc-systems \
+  meta.helm.sh/release-namespace=arc-systems
+```
+
+### Step 1: Pre-create the `arc-runners` namespace
+
+Same as the AMD64 flow — the namespace must exist with Helm labels before the GitHub secret can be injected:
+
+```bash
+kubectl --context=parma create namespace arc-runners
+kubectl --context=parma label namespace arc-runners app.kubernetes.io/managed-by=Helm
+kubectl --context=parma annotate namespace arc-runners \
+  meta.helm.sh/release-name=theia-arc-runners \
+  meta.helm.sh/release-namespace=arc-runners
+```
+
+Then create the GitHub auth secret (see AMD64 Step 1 for secret options).
+
+### Step 2: Deploy Part 1 — Controller + Build Caches
+
+```bash
 helm install theia-arc-systems . \
   --namespace arc-systems \
   --create-namespace \
   -f values-arm64.yaml \
   --set arcRunnersArm.enabled=false \
-  --wait --timeout 10m
+  --wait --timeout 2m
 
 # Part 2
 helm install theia-arc-runners . \
   --namespace arc-runners \
-  --create-namespace \
   -f values-arm64.yaml \
   --set buildCaches.enabled=false \
   --set arcController.enabled=false \
   --set arcRunnersArm.enabled=true \
-  --wait --timeout 10m
+  --wait --timeout 2m
 ```
 
 ## Uninstallation
@@ -207,14 +230,14 @@ helm upgrade theia-arc-systems . \
   --namespace arc-systems \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
-  --wait --timeout 10m
+  --wait --timeout 2m
 
 helm upgrade theia-arc-runners . \
   --namespace arc-runners \
   --set buildCaches.enabled=false \
   --set arcController.enabled=false \
   --set arcRunners.enabled=true \
-  --wait --timeout 10m
+  --wait --timeout 2m
 ```
 
 ## Configuration
