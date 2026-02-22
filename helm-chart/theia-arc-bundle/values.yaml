@@ -30,7 +30,9 @@ arcRunners:
   runnerScaleSetName: "arc-runner-set-stateless"
   controllerServiceAccount:
     namespace: arc-systems
-    name: gha-rs-controller
+    # This must match <Part-1-release-name>-gha-rs-controller.
+    # Part 1 MUST be deployed with: helm install theia-arc-systems ...
+    name: theia-arc-systems-gha-rs-controller
   template:
     spec:
       serviceAccountName: arc-runner-set-stateless-sa
@@ -123,7 +125,8 @@ arcRunnersArm:
   runnerScaleSetName: "arc-runner-set-stateless-arm"
   controllerServiceAccount:
     namespace: arc-systems
-    name: gha-rs-controller
+    # Must match <Part-1-release-name>-gha-rs-controller (release name must be theia-arc-systems)
+    name: theia-arc-systems-gha-rs-controller
   template:
     spec:
       serviceAccountName: arc-runner-set-stateless-arm-sa

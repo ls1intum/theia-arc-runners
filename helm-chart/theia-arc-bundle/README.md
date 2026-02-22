@@ -17,465 +17,265 @@ This chart deploys a complete ARC setup with integrated build caches:
   - gha-runner-scale-set-controller (v0.9.3)
   - gha-runner-scale-set (AMD64 and/or ARM64)
 
+## Why Two Helm Commands?
+
+GitHub's security best practice requires the ARC **controller** and **runners** to live in separate namespaces (`arc-systems` and `arc-runners`). Helm 3 cannot deploy subcharts into different namespaces within a single release — it's a hard constraint of Helm's ownership model.
+
+The solution is to deploy the **same chart twice** using feature flags:
+
+| Command | Release name | Namespace | What gets deployed |
+|---------|-------------|-----------|-------------------|
+| Part 1 | `theia-arc-systems` | `arc-systems` | Controller + all build caches |
+| Part 2 | `theia-arc-runners` | `arc-runners` | AutoscalingRunnerSet only |
+
+> **Important:** The Part 1 release name **must** be `theia-arc-systems`. The controller creates a ServiceAccount named `<release-name>-gha-rs-controller`, and Part 2 references it by that exact name.
+
+Note: The build caches land in their own namespaces (`squid`, `verdaccio`, etc.) even though they are part of the Part 1 release. This works because the `build-caches` local subchart hardcodes `namespace:` on each resource directly in its templates — so Helm's release still belongs to `arc-systems` but individual resources are written to their respective namespaces. The upstream ARC charts (third-party) use `Release.Namespace` throughout and cannot be overridden this way, hence the split.
+
 ## Prerequisites
 
 1. **Kubernetes cluster** (v1.23+)
 2. **Helm** (v3.8+)
-3. **GitHub Personal Access Token** with `repo`, `admin:org` scopes
-4. **Storage provisioner** configured (StorageClass available)
+3. **GitHub App** (recommended) or Personal Access Token with `repo` + `admin:org` scopes
+4. **StorageClass** configured (default: `csi-rbd-sc`)
+5. **Squid CA certificate** secret pre-created (see below)
 
-## Quick Start
+## Quick Start (AMD64 / theia-prod)
 
-### AMD64 Cluster (theia-prod)
+### Step 1: Create the Squid CA secret
+
+Squid uses SSL bumping to cache HTTPS traffic. It needs a CA cert+key pair to sign intercepted connections. Generate one and create the secret **before** installing the chart:
 
 ```bash
+openssl req -new -newkey rsa:4096 -days 3650 -nodes -x509 \
+  -subj "/CN=Squid CA/O=Theia/C=DE" \
+  -keyout squid-ca.key -out squid-ca.crt
+
+kubectl create namespace squid --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create secret generic squid-ca-cert \
+  --namespace=squid \
+  --from-file=tls.crt=squid-ca.crt \
+  --from-file=tls.key=squid-ca.key
+
+rm squid-ca.crt squid-ca.key
+```
+
+### Step 2: Create the GitHub auth secret
+
+**Option A — GitHub App (recommended):**
+
+```bash
+kubectl create namespace arc-runners --dry-run=client -o yaml | kubectl apply -f -
+
 kubectl create secret generic github-arc-secret \
   --namespace=arc-runners \
-  --from-literal=github_token="YOUR_GITHUB_PAT"
-
-./scripts/setup-squid-ca.sh
-
-helm install theia-arc ./helm-chart/theia-arc-bundle \
-  --namespace arc-runners \
-  --create-namespace \
-  --wait \
-  --timeout 10m
+  --from-literal=github_app_id="<APP_ID>" \
+  --from-literal=github_app_installation_id="<INSTALLATION_ID>" \
+  --from-file=github_app_private_key=<path-to-private-key.pem>
 ```
 
-### ARM64 Cluster (parma)
+**Option B — Personal Access Token:**
 
 ```bash
-kubectl create secret generic github-arc-secret \
-  --namespace=arc-runners \
-  --from-literal=github_token="YOUR_GITHUB_PAT"
+kubectl create namespace arc-runners --dry-run=client -o yaml | kubectl apply -f -
 
-./scripts/setup-squid-ca.sh
-
-helm install theia-arc ./helm-chart/theia-arc-bundle \
-  --namespace arc-runners \
-  --create-namespace \
-  -f ./helm-chart/theia-arc-bundle/values-arm64.yaml \
-  --wait \
-  --timeout 10m
-```
-
-## Architecture
-
-### Two-Cluster Deployment
-
-This chart is designed for deployment across two distinct Kubernetes clusters:
-
-| Cluster | Architecture | Storage | PVC Sizes | Use Case |
-|---------|-------------|---------|-----------|----------|
-| **theia-prod** | AMD64 | Ceph RBD (`csi-rbd-sc`) | Large (200Gi Docker, 50Gi npm) | Production workloads |
-| **parma** | ARM64 | local-path | Small (10Gi Docker, 5Gi npm) + memory-backed work | ARM builds, testing |
-
-### Dependency Management
-
-Runners include init containers that wait for all cache services to be ready:
-
-```yaml
-initContainers:
-  - name: wait-for-caches
-    image: busybox:1.36
-    command: [sh, -c]
-    args:
-      - |
-        until nc -z registry-mirror.registry-mirror.svc.cluster.local 5000; do sleep 2; done
-        until nc -z verdaccio.verdaccio.svc.cluster.local 4873; do sleep 2; done
-        # ... checks for all 5 cache services
-```
-
-This ensures runners never start before caches are available (no race conditions).
-
-## Configuration
-
-### Values Files
-
-- **`values.yaml`**: AMD64/theia-prod defaults
-- **`values-arm64.yaml`**: ARM64/parma overlay (merge with values.yaml)
-
-### Key Configuration Options
-
-#### Global Settings
-
-```yaml
-global:
-  storageClass: "csi-rbd-sc"
-  nodeSelector:
-    kubernetes.io/arch: amd64
-  tolerations: []
-```
-
-#### Build Caches
-
-```yaml
-buildCaches:
-  enabled: true
-  dockerMirror:
-    enabled: true
-    pvcSize: "200Gi"
-  ghcrMirror:
-    enabled: true
-    pvcSize: "200Gi"
-  verdaccio:
-    enabled: true
-    pvcSize: "50Gi"
-  aptCacher:
-    enabled: true
-    pvcSize: "50Gi"
-  squid:
-    enabled: true
-    pvcSize: "20Gi"
-    caSecretName: "squid-ca-cert"
-```
-
-#### ARC Runners
-
-```yaml
-arcRunners:
-  enabled: true
-  githubConfigUrl: "https://github.com/ls1intum"
-  githubConfigSecret: "github-arc-secret"
-  minRunners: 10
-  maxRunners: 50
-  runnerScaleSetName: "arc-runner-set-stateless"
-  controllerServiceAccount:
-    namespace: arc-systems
-    name: gha-rs-controller
-```
-
-#### External Secrets (Optional)
-
-```yaml
-externalSecrets:
-  enabled: true
-  secretStore: "vault-backend"
-  githubPat:
-    remoteRef:
-      key: "github/actions-pat"
-      property: "token"
-```
-
-## Installation
-
-### Step 1: Create Prerequisites
-
-#### GitHub PAT Secret (Required)
-
-```bash
 kubectl create secret generic github-arc-secret \
   --namespace=arc-runners \
   --from-literal=github_token="ghp_xxxxxxxxxxxxxxxxxxxx"
 ```
 
-**Required scopes:**
-- `repo` (full control of private repositories)
-- `admin:org` → `manage_runners:org` (manage self-hosted runners)
-
-#### Squid CA Certificate (Required for VSIX caching)
-
-```bash
-kubectl config use-context <cluster-name>
-./scripts/setup-squid-ca.sh
-```
-
-This creates a `squid-ca-cert` secret in the `squid` namespace with a self-signed CA for SSL bumping.
-
-### Step 2: Install Chart
-
-#### AMD64 (Default)
+### Step 3: Deploy Part 1 — Controller + Build Caches
 
 ```bash
 cd helm-chart/theia-arc-bundle
-helm dependency build
 
-helm install theia-arc . \
-  --namespace arc-runners \
+helm install theia-arc-systems . \
+  --namespace arc-systems \
   --create-namespace \
+  --set arcRunners.enabled=false \
+  --set arcRunnersArm.enabled=false \
   --wait \
   --timeout 10m
 ```
 
-#### ARM64 (With Overlay)
+Verify the controller is running before proceeding:
 
 ```bash
-helm install theia-arc . \
+kubectl get pods -n arc-systems
+# Expected: theia-arc-systems-gha-rs-controller-... 1/1 Running
+```
+
+### Step 4: Deploy Part 2 — Runners
+
+```bash
+helm install theia-arc-runners . \
+  --namespace arc-runners \
+  --create-namespace \
+  --set buildCaches.enabled=false \
+  --set arcController.enabled=false \
+  --set arcRunners.enabled=true \
+  --wait \
+  --timeout 10m
+```
+
+### Step 5: Verify
+
+```bash
+kubectl get pods -n arc-systems
+kubectl get pods -n arc-runners
+kubectl get pods -n squid
+kubectl get pods -n verdaccio
+kubectl get pods -n registry-mirror
+kubectl get pods -n apt-cacher-ng
+kubectl get autoscalingrunnersets -n arc-runners
+```
+
+## ARM64 Cluster (parma)
+
+Use `values-arm64.yaml` as an overlay. The two-step process is identical:
+
+```bash
+# Part 1
+helm install theia-arc-systems . \
+  --namespace arc-systems \
+  --create-namespace \
+  -f values-arm64.yaml \
+  --set arcRunnersArm.enabled=false \
+  --wait --timeout 10m
+
+# Part 2
+helm install theia-arc-runners . \
   --namespace arc-runners \
   --create-namespace \
   -f values-arm64.yaml \
-  --wait \
-  --timeout 10m
-```
-
-### Step 3: Verify Installation
-
-```bash
-kubectl get pods --all-namespaces | grep -E "(registry|verdaccio|apt|squid|arc)"
-
-kubectl get autoscalingrunnersets -n arc-runners
-
-helm status theia-arc -n arc-runners
-```
-
-## Upgrading
-
-### Update Configuration
-
-Edit `values.yaml` or create a new overlay file.
-
-### Apply Upgrade
-
-```bash
-helm upgrade theia-arc . \
-  --namespace arc-runners \
-  --wait \
-  --timeout 10m
-```
-
-### Rollback (If Needed)
-
-```bash
-helm rollback theia-arc -n arc-runners
-
-helm history theia-arc -n arc-runners
+  --set buildCaches.enabled=false \
+  --set arcController.enabled=false \
+  --set arcRunnersArm.enabled=true \
+  --wait --timeout 10m
 ```
 
 ## Uninstallation
 
-```bash
-helm uninstall theia-arc -n arc-runners
+> **Always uninstall in this order.** Deleting namespaces before Helm uninstall causes ARC runners to get stuck with finalizers that block namespace deletion indefinitely.
 
-kubectl delete namespace arc-systems arc-runners
-kubectl delete namespace registry-mirror verdaccio apt-cacher-ng squid
+```bash
+# Step 1: Runners first — ARC gracefully deregisters from GitHub
+helm uninstall theia-arc-runners -n arc-runners
+
+# Step 2: Controller + caches
+helm uninstall theia-arc-systems -n arc-systems
+
+# Step 3: Delete namespaces
+kubectl delete namespace arc-runners arc-systems
+kubectl delete namespace squid verdaccio registry-mirror apt-cacher-ng
 ```
 
-**Warning:** This will delete all PVCs and cached data.
+**Warning:** This deletes all PVCs and cached data.
+
+## Upgrading
+
+Upgrade each release independently:
+
+```bash
+helm upgrade theia-arc-systems . \
+  --namespace arc-systems \
+  --set arcRunners.enabled=false \
+  --set arcRunnersArm.enabled=false \
+  --wait --timeout 10m
+
+helm upgrade theia-arc-runners . \
+  --namespace arc-runners \
+  --set buildCaches.enabled=false \
+  --set arcController.enabled=false \
+  --set arcRunners.enabled=true \
+  --wait --timeout 10m
+```
+
+## Configuration
+
+### Key values
+
+| Value | Default | Description |
+|-------|---------|-------------|
+| `global.storageClass` | `csi-rbd-sc` | StorageClass for all PVCs |
+| `global.nodeSelector` | `kubernetes.io/arch: amd64` | Node selector for all pods |
+| `buildCaches.enabled` | `true` | Deploy build cache services |
+| `arcController.enabled` | `true` | Deploy ARC controller |
+| `arcRunners.enabled` | `true` | Deploy AMD64 runner scale set |
+| `arcRunnersArm.enabled` | `false` | Deploy ARM64 runner scale set |
+| `arcRunners.minRunners` | `10` | Minimum idle runners |
+| `arcRunners.maxRunners` | `50` | Maximum runners |
+| `arcRunners.githubConfigUrl` | `https://github.com/ls1intum` | GitHub org URL |
+| `arcRunners.githubConfigSecret` | `github-arc-secret` | Name of auth secret in `arc-runners` |
+| `buildCaches.squid.caSecretName` | `squid-ca-cert` | Name of Squid CA secret in `squid` ns |
+
+### Namespace summary
+
+| Namespace | Created by | Contains |
+|-----------|-----------|----------|
+| `arc-systems` | Part 1 (`--create-namespace`) | Controller, Listener pod |
+| `arc-runners` | Part 2 (`--create-namespace`) | AutoscalingRunnerSet, Runner pods |
+| `squid` | Part 1 (build-caches subchart) | Squid proxy |
+| `verdaccio` | Part 1 (build-caches subchart) | npm cache |
+| `registry-mirror` | Part 1 (build-caches subchart) | Docker Hub + GHCR mirrors |
+| `apt-cacher-ng` | Part 1 (build-caches subchart) | apt package cache |
 
 ## Troubleshooting
 
-### Runners Not Starting
+### Runners stuck in `Init:0/2`
 
-**Symptom:** Runner pods stuck in `Init:0/2` or `Init:1/2`
+The `wait-for-caches` init container is waiting for a cache service. Check which one:
 
-**Diagnosis:**
 ```bash
 kubectl logs -n arc-runners <runner-pod> -c wait-for-caches
+kubectl get pods -n squid -n verdaccio -n registry-mirror -n apt-cacher-ng
 ```
 
-**Common Causes:**
-1. Cache services not running
-2. Network policies blocking traffic
-3. Service DNS resolution failing
+Most common cause: Squid in `CrashLoopBackOff` due to an invalid CA key. Verify:
 
-**Fix:**
 ```bash
-kubectl get pods -n registry-mirror
-kubectl get pods -n verdaccio
-kubectl get pods -n squid
-
-kubectl describe pod -n arc-runners <runner-pod>
+kubectl get secret squid-ca-cert -n squid -o jsonpath='{.data.tls\.key}' | base64 -d | openssl rsa -check -noout
+# Expected: RSA key ok
 ```
 
-### GitHub Workflows Not Triggering Runners
+### Runners don't pick up GitHub Actions jobs
 
-**Symptom:** Workflows queue indefinitely, no runner pods spawn
-
-**Diagnosis:**
 ```bash
-kubectl logs -n arc-systems -l app.kubernetes.io/name=gha-runner-scale-set-controller --tail=100
+kubectl get pods -n arc-systems | grep listener
+kubectl logs -n arc-systems -l app.kubernetes.io/name=gha-runner-scale-set-controller --tail=50
+kubectl get secret github-arc-secret -n arc-runners
 ```
 
-**Common Causes:**
-1. Invalid GitHub PAT
-2. Wrong GitHub org URL
-3. Controller not running
+### `helm install` fails with "invalid ownership metadata"
 
-**Fix:**
+A namespace was manually created before Helm. Strip its finalizers and delete it, then re-run with `--create-namespace`:
+
 ```bash
-kubectl get secret github-arc-secret -n arc-runners -o jsonpath='{.data.github_token}' | base64 -d
-
-kubectl get pods -n arc-systems
+kubectl get namespace arc-runners -o json \
+  | jq '.spec.finalizers = []' \
+  | kubectl replace --raw /api/v1/namespaces/arc-runners/finalize -f -
+kubectl delete namespace arc-runners --force --grace-period=0
 ```
 
-### Cache Not Working
+### Runners stuck terminating after `helm uninstall`
 
-**Symptom:** Builds still download from internet, no cache hits
+The controller was deleted before runners finished deregistering. Strip finalizers manually:
 
-**Diagnosis:**
 ```bash
-kubectl run test-cache --image=alpine --rm -it --restart=Never -- sh
-nc -zv registry-mirror.registry-mirror.svc.cluster.local 5000
-nc -zv verdaccio.verdaccio.svc.cluster.local 4873
-```
-
-**Common Causes:**
-1. Runners not configured with cache endpoints
-2. Services not exposing correct ports
-3. ConfigMaps not mounted
-
-**Fix:**
-```bash
-kubectl get svc -n registry-mirror
-kubectl logs -n registry-mirror <registry-pod>
-```
-
-### PVC Stuck in Pending
-
-**Symptom:** Pods can't start because PVCs won't bind
-
-**Diagnosis:**
-```bash
-kubectl get pvc -A | grep Pending
-kubectl describe pvc <pvc-name> -n <namespace>
-```
-
-**Common Causes:**
-1. StorageClass doesn't exist
-2. No available PVs
-3. Node affinity mismatch
-
-**Fix:**
-```bash
-kubectl get storageclass
-
-helm upgrade theia-arc . \
-  --set global.storageClass="<correct-class>" \
-  --namespace arc-runners
-```
-
-## Testing
-
-See [../../docs/TESTING.md](../../docs/TESTING.md) for comprehensive test procedures.
-
-## GitOps Integration
-
-### ArgoCD Application
-
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: theia-arc-amd64
-  namespace: argocd
-spec:
-  project: infrastructure
-  source:
-    repoURL: https://github.com/ls1intum/theia-arc-runners
-    targetRevision: main
-    path: helm-chart/theia-arc-bundle
-    helm:
-      valueFiles:
-        - values.yaml
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: arc-runners
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
-```
-
-### Flux HelmRelease
-
-```yaml
-apiVersion: helm.toolkit.fluxcd.io/v2beta1
-kind: HelmRelease
-metadata:
-  name: theia-arc-arm64
-  namespace: flux-system
-spec:
-  interval: 10m
-  chart:
-    spec:
-      chart: ./helm-chart/theia-arc-bundle
-      sourceRef:
-        kind: GitRepository
-        name: theia-arc-runners
-      interval: 1m
-  valuesFrom:
-    - kind: ConfigMap
-      name: theia-arc-values-arm64
-  install:
-    createNamespace: true
-    remediation:
-      retries: 3
-  upgrade:
-    remediation:
-      retries: 3
-```
-
-## Advanced Configuration
-
-### Custom Runner Images
-
-```yaml
-arcRunners:
-  template:
-    spec:
-      containers:
-        - name: runner
-          image: ghcr.io/ls1intum/custom-runner:latest
-```
-
-### Resource Limits
-
-```yaml
-arcRunners:
-  template:
-    spec:
-      containers:
-        - name: runner
-          resources:
-            requests:
-              cpu: 1000m
-              memory: 2Gi
-            limits:
-              cpu: 8000m
-              memory: 16Gi
-```
-
-### Custom Init Commands
-
-```yaml
-arcRunners:
-  template:
-    spec:
-      initContainers:
-        - name: custom-setup
-          image: alpine:latest
-          command: [sh, -c, "echo 'Custom setup'"]
+kubectl get ephemeralrunners -n arc-runners -o name | xargs -I{} kubectl patch {} -n arc-runners \
+  --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]'
+kubectl get autoscalingrunnersets -n arc-runners -o name | xargs -I{} kubectl patch {} -n arc-runners \
+  --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]'
 ```
 
 ## Chart Dependencies
 
-This chart depends on:
-
-- **build-caches** (v0.1.0) - Local subchart (`file://charts/build-caches`)
-- **gha-runner-scale-set-controller** (v0.9.3) - OCI registry (`ghcr.io/actions/actions-runner-controller-charts`)
-- **gha-runner-scale-set** (v0.9.3 × 2) - OCI registry (AMD64 + ARM64 aliases)
-
-Dependencies are fetched automatically during `helm dependency build`.
-
-## Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 0.1.0 | 2026-02-16 | Initial Helm chart conversion from bash scripts |
-
-## Contributing
-
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) for development guidelines.
-
-## License
-
-See [LICENSE](../../LICENSE) for license information.
+- **build-caches** (v0.1.0) — local subchart (`charts/build-caches`)
+- **gha-runner-scale-set-controller** (v0.9.3) — `ghcr.io/actions/actions-runner-controller-charts`
+- **gha-runner-scale-set** (v0.9.3 × 2) — AMD64 + ARM64 aliases
 
 ## References
 
 - [GitHub Actions Runner Controller](https://github.com/actions/actions-runner-controller)
-- [Helm Documentation](https://helm.sh/docs/)
-- [Kubernetes Storage Concepts](https://kubernetes.io/docs/concepts/storage/)
-- [Implementation Reference](../../HELM_IMPLEMENTATION.md)
+- [ARC Security Best Practices](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners-with-actions-runner-controller/deploying-runner-scale-sets-with-actions-runner-controller#security-considerations)
