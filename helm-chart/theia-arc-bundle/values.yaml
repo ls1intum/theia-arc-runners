@@ -126,7 +126,7 @@ arcRunnersArm:
   githubConfigSecret: "github-arc-secret"
   minRunners: 10
   maxRunners: 50
-  runnerScaleSetName: "arc-runner-set-stateless-arm"
+  runnerScaleSetName: "arc-runner-set-arm64"
   controllerServiceAccount:
     namespace: arc-systems
     # Must match <Part-1-release-name>-gha-rs-controller (release name must be theia-arc-systems)
