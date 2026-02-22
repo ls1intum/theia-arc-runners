@@ -17,7 +17,7 @@ dockerMirror:
       memory: 10Gi   # Increased from 1Gi to prevent OOM during heavy CI/CD
   garbageCollection:
     enabled: true
-    schedule: "0 3 * * 0"  # Sunday at 3 AM
+    schedule: "0 3 */2 * *"
     deleteUntagged: true
     resources:
       requests:
@@ -41,7 +41,7 @@ ghcrMirror:
       memory: 10Gi   # Increased from 1Gi to prevent OOM during heavy CI/CD
   garbageCollection:
     enabled: true
-    schedule: "0 3 * * 0"  # Sunday at 3 AM
+    schedule: "0 3 */2 * *"
     deleteUntagged: true
     resources:
       requests:
