@@ -6,6 +6,8 @@ global:
 
 buildCaches:
   enabled: true
+
+"build-caches":
   dockerMirror:
     pvcSize: "200Gi"
   ghcrMirror:
@@ -17,6 +19,8 @@ buildCaches:
   squid:
     pvcSize: "20Gi"
     caSecretName: "squid-ca-cert"
+    certManager:
+      enabled: true
 
 arcController:
   enabled: true

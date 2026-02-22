@@ -9,6 +9,7 @@ metadata:
     app.kubernetes.io/name: squid
     app.kubernetes.io/component: extension-cache
 
+{{- if .Values.squid.certManager.enabled }}
 ---
 apiVersion: cert-manager.io/v1
 kind: Issuer
@@ -51,6 +52,7 @@ spec:
     name: squid-selfsigned-issuer
     kind: Issuer
     group: cert-manager.io
+{{- end }}
 
 ---
 apiVersion: v1

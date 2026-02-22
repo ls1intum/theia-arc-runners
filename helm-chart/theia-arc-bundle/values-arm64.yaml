@@ -8,6 +8,8 @@ global:
 
 buildCaches:
   enabled: true
+
+"build-caches":
   dockerMirror:
     pvcSize: "10Gi"
   ghcrMirror:
@@ -18,6 +20,8 @@ buildCaches:
     pvcSize: "10Gi"
   squid:
     pvcSize: "5Gi"
+    certManager:
+      enabled: false
 
 # Disable AMD64 runners
 arcRunners:

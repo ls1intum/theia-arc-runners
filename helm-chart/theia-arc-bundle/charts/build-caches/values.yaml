@@ -82,6 +82,10 @@ squid:
   pvcSize: 20Gi
   storageClass: ""
   caSecretName: squid-ca-cert
+  certManager:
+    # Set to false on clusters without cert-manager (e.g. parma).
+    # When false, the squid-ca-cert secret must already exist (manually created).
+    enabled: true
   sslDomains:
     - .vsassets.io
     - .visualstudio.com
