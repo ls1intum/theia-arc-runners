@@ -54,7 +54,7 @@ arcRunners:
             - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
               value: "false"
             - name: ACTIONS_CACHE_URL
-              value: http://github-actions-cache-server.arc-systems.svc.cluster.local:3000/
+              value: http://theia-arc-systems-github-actions-cache-server.arc-systems.svc.cluster.local:3000/
           volumeMounts:
             - name: work
               mountPath: /home/runner/_work
@@ -121,7 +121,7 @@ arcRunnersArm:
             - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
               value: "false"
             - name: ACTIONS_CACHE_URL
-              value: http://github-actions-cache-server.arc-systems.svc.cluster.local:3000/
+              value: http://theia-arc-systems-github-actions-cache-server.arc-systems.svc.cluster.local:3000/
           volumeMounts:
             - name: work
               mountPath: /home/runner/_work
