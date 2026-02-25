@@ -7,7 +7,7 @@ global:
     kubernetes.io/arch: arm64
 
 buildCaches:
-  enabled: true
+  enabled: false
 
 "build-caches":
   dockerMirror:
