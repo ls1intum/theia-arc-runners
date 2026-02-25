@@ -4,11 +4,11 @@
 
 This Helm chart has deployed the following components:
 
-{{ if (index .Values "github-actions-cache-server").enabled | default .Values.cacheServer.enabled -}}
+{{ if (index .Values "cache-server").enabled -}}
 GITHUB ACTIONS CACHE SERVER:
   - Service URL: http://github-actions-cache-server.{{ .Release.Namespace }}.svc.cluster.local:3000/
-  - Storage: {{ .Values.cacheServer.persistentVolumeClaim.storage | default "200Gi" }} PVC ({{ .Values.cacheServer.config.storage.driver | default "filesystem" }})
-  - Cleanup: {{ .Values.cacheServer.config.cacheCleanupOlderThanDays | default 90 }} days
+  - Storage: {{ (index .Values "cache-server").persistentVolumeClaim.storage | default "200Gi" }} PVC ({{ (index .Values "cache-server").config.storage.driver | default "filesystem" }})
+  - Cleanup: {{ (index .Values "cache-server").config.cacheCleanupOlderThanDays | default 90 }} days
 {{- end }}
 
 {{ if .Values.arcController.enabled -}}

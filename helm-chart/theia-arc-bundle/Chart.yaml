@@ -36,4 +36,5 @@ dependencies:
   # GitHub Actions Cache Server (local subchart from https://github.com/falcondev-oss/github-actions-cache-server)
   - name: github-actions-cache-server
     version: 1.0.0
-    condition: cacheServer.enabled
+    alias: cache-server
+    condition: cache-server.enabled

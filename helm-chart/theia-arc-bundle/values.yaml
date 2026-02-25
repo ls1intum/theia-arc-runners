@@ -144,7 +144,7 @@ arcRunnersArm:
         - name: dind-externals
           emptyDir: {}
 
-cacheServer:
+cache-server:
   enabled: true
   replicaCount: 1
   config:

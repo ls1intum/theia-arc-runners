@@ -25,7 +25,7 @@ arcRunnersArm:
         - name: dind-externals
           emptyDir: {}
 
-cacheServer:
+cache-server:
   enabled: true
   persistentVolumeClaim:
     storage: 200Gi
