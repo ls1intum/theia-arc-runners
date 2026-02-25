@@ -4,24 +4,6 @@ global:
     kubernetes.io/arch: amd64
   tolerations: []
 
-buildCaches:
-  enabled: false
-
-"build-caches":
-  dockerMirror:
-    pvcSize: "200Gi"
-  ghcrMirror:
-    pvcSize: "200Gi"
-  verdaccio:
-    pvcSize: "50Gi"
-  aptCacher:
-    pvcSize: "50Gi"
-  squid:
-    pvcSize: "20Gi"
-    caSecretName: "squid-ca-cert"
-    certManager:
-      enabled: true
-
 arcController:
   enabled: true
 
@@ -71,6 +53,8 @@ arcRunners:
               value: unix:///var/run/docker.sock
             - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
               value: "false"
+            - name: ACTIONS_CACHE_URL
+              value: http://github-actions-cache-server.arc-systems.svc.cluster.local:3000/
           volumeMounts:
             - name: work
               mountPath: /home/runner/_work
@@ -136,6 +120,8 @@ arcRunnersArm:
               value: unix:///var/run/docker.sock
             - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
               value: "false"
+            - name: ACTIONS_CACHE_URL
+              value: http://github-actions-cache-server.arc-systems.svc.cluster.local:3000/
           volumeMounts:
             - name: work
               mountPath: /home/runner/_work
@@ -157,6 +143,36 @@ arcRunnersArm:
           emptyDir: {}
         - name: dind-externals
           emptyDir: {}
+
+cacheServer:
+  enabled: true
+  replicaCount: 1
+  config:
+    apiBaseUrl: ""
+    enableDirectDownloads: false
+    cacheCleanupOlderThanDays: 90
+    storage:
+      driver: filesystem
+      filesystem:
+        path: /data/cache
+    db:
+      driver: sqlite
+      sqlite:
+        path: /data/cache-server.db
+  persistentVolumeClaim:
+    enabled: true
+    accessModes:
+      - ReadWriteOnce
+    storage: 200Gi
+  resources:
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  nodeSelector:
+    kubernetes.io/arch: amd64
+  tolerations: []
 
 externalSecrets:
   enabled: false

@@ -4,14 +4,11 @@
 
 This Helm chart has deployed the following components:
 
-{{ if .Values.buildCaches.enabled -}}
-BUILD CACHES:
-  - Docker Registry Mirror (Docker Hub): registry-mirror.registry-mirror.svc.cluster.local:5000
-  - Docker Registry Mirror (GHCR): registry-mirror-ghcr.registry-mirror.svc.cluster.local:5000
-  - Verdaccio (npm): verdaccio.verdaccio.svc.cluster.local:4873
-  - Apt-Cacher-NG: apt-cacher-ng.apt-cacher-ng.svc.cluster.local:3142
-  - Squid Proxy: squid.squid.svc.cluster.local:3128
-  - Squid CA cert: auto-issued by cert-manager (secret: squid-ca-cert in squid ns)
+{{ if (index .Values "github-actions-cache-server").enabled | default .Values.cacheServer.enabled -}}
+GITHUB ACTIONS CACHE SERVER:
+  - Service URL: http://github-actions-cache-server.{{ .Release.Namespace }}.svc.cluster.local:3000/
+  - Storage: {{ .Values.cacheServer.persistentVolumeClaim.storage | default "200Gi" }} PVC ({{ .Values.cacheServer.config.storage.driver | default "filesystem" }})
+  - Cleanup: {{ .Values.cacheServer.config.cacheCleanupOlderThanDays | default 90 }} days
 {{- end }}
 
 {{ if .Values.arcController.enabled -}}
@@ -26,6 +23,7 @@ ARC RUNNERS (AMD64):
   - Min Runners: {{ .Values.arcRunners.minRunners }}
   - Max Runners: {{ .Values.arcRunners.maxRunners }}
   - GitHub Org: {{ .Values.arcRunners.githubConfigUrl }}
+  - Cache: Configured via ACTIONS_CACHE_URL
 {{- end }}
 
 {{ if .Values.arcRunnersArm.enabled -}}
@@ -34,20 +32,29 @@ ARC RUNNERS (ARM64):
   - Min Runners: {{ .Values.arcRunnersArm.minRunners }}
   - Max Runners: {{ .Values.arcRunnersArm.maxRunners }}
   - GitHub Org: {{ .Values.arcRunnersArm.githubConfigUrl }}
+  - Cache: Configured via ACTIONS_CACHE_URL
 {{- end }}
 
 ========================================
 VERIFICATION COMMANDS
 ========================================
 
-Check all pods:
-  kubectl get pods --all-namespaces | grep -E "(registry|verdaccio|apt|squid|arc)"
+Check all ARC pods:
+  kubectl get pods -n arc-systems
+  kubectl get pods -n arc-runners
+
+Check cache server:
+  kubectl get pods -n arc-systems -l app.kubernetes.io/name=github-actions-cache-server
+  kubectl get pvc -n arc-systems github-actions-cache-server
 
 Check runner scale sets:
   kubectl get autoscalingrunnersets -n arc-runners
 
 View controller logs:
   kubectl logs -n arc-systems -l app.kubernetes.io/name=gha-runner-scale-set-controller --tail=50
+
+View cache server logs:
+  kubectl logs -n arc-systems -l app.kubernetes.io/name=github-actions-cache-server --tail=50
 
 ========================================
 UPGRADE / ROLLBACK
@@ -66,18 +73,23 @@ View release history:
 TROUBLESHOOTING
 ========================================
 
-If runners fail to start, check init container logs:
-  kubectl logs -n arc-runners <runner-pod> -c wait-for-caches
-
-Verify cache services are running:
-  kubectl get pods -n registry-mirror
-  kubectl get pods -n verdaccio
-  kubectl get pods -n squid
-
 If workflows don't trigger runners:
   kubectl logs -n arc-systems -l app.kubernetes.io/name=gha-runner-scale-set-controller
   kubectl get secret github-arc-secret -n arc-runners
 
+If cache is not working:
+  kubectl logs -n arc-systems -l app.kubernetes.io/name=github-actions-cache-server
+  kubectl get svc -n arc-systems github-actions-cache-server
+  # Test from runner pod:
+  kubectl exec -it -n arc-runners <runner-pod> -c runner -- curl http://github-actions-cache-server.arc-systems.svc.cluster.local:3000/health
+
+If PVC is full:
+  # Check usage
+  kubectl exec -n arc-systems <cache-server-pod> -- df -h /data
+  # Increase size
+  kubectl edit pvc github-actions-cache-server -n arc-systems
+
 For more help:
   Repository: https://github.com/ls1intum/theia-arc-runners
   Docs: helm-chart/theia-arc-bundle/README.md
+  Cache Server Docs: https://gha-cache-server.falcondev.io

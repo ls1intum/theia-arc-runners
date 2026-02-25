@@ -1,17 +1,16 @@
 # Theia ARC Bundle Helm Chart
 
-Production-grade Helm umbrella chart for GitHub Actions Runner Controller (ARC) with build cache infrastructure.
+Production-grade Helm umbrella chart for GitHub Actions Runner Controller (ARC) with GitHub Actions Cache Server.
 
 ## Overview
 
-This chart deploys a complete ARC setup with integrated build caches:
+This chart deploys a complete ARC setup with integrated caching:
 
-- **Build Caches** (local subchart):
-  - Docker Registry Mirror (Docker Hub)
-  - Docker Registry Mirror (GHCR)
-  - Verdaccio (npm cache)
-  - Apt-Cacher-NG (Ubuntu/Debian packages)
-  - Squid (HTTPS proxy with SSL bumping for VSIX)
+- **GitHub Actions Cache Server** (git submodule):
+  - Drop-in replacement for GitHub's hosted cache service
+  - Compatible with official `actions/cache` action
+  - Persistent storage backend (filesystem + SQLite)
+  - 200GB PVC per cluster
 
 - **ARC Components** (external charts):
   - gha-runner-scale-set-controller (v0.9.3)
@@ -19,26 +18,34 @@ This chart deploys a complete ARC setup with integrated build caches:
 
 ## Why Two Helm Commands?
 
-GitHub's security best practice requires the ARC **controller** and **runners** to live in separate namespaces (`arc-systems` and `arc-runners`). Helm 3 cannot deploy subcharts into different namespaces within a single release — it's a hard constraint of Helm's ownership model.
+GitHub's security best practice requires the ARC **controller** and **runners** to live in separate namespaces (`arc-systems` and `arc-runners`). Helm 3 cannot deploy subcharts into different namespaces within a single release.
 
 The solution is to deploy the **same chart twice** using feature flags:
 
 | Command | Release name | Namespace | What gets deployed |
 |---------|-------------|-----------|-------------------|
-| Part 1 | `theia-arc-systems` | `arc-systems` | Controller + all build caches |
+| Part 1 | `theia-arc-systems` | `arc-systems` | Controller + Cache Server |
 | Part 2 | `theia-arc-runners` | `arc-runners` | AutoscalingRunnerSet only |
 
 > **Important:** The Part 1 release name **must** be `theia-arc-systems`. The controller creates a ServiceAccount named `<release-name>-gha-rs-controller`, and Part 2 references it by that exact name.
-
-Note: The build caches land in their own namespaces (`squid`, `verdaccio`, etc.) even though they are part of the Part 1 release. This works because the `build-caches` local subchart hardcodes `namespace:` on each resource directly in its templates — so Helm's release still belongs to `arc-systems` but individual resources are written to their respective namespaces. The upstream ARC charts (third-party) use `Release.Namespace` throughout and cannot be overridden this way, hence the split.
 
 ## Prerequisites
 
 1. **Kubernetes cluster** (v1.23+)
 2. **Helm** (v3.8+)
-3. **cert-manager** installed in the cluster (for automatic Squid CA generation — see [Manual Squid CA](#squid-ca--manual-setup-without-cert-manager) if unavailable)
-4. **GitHub App** (recommended) or Personal Access Token with `repo` + `admin:org` scopes
-5. **StorageClass** configured (default: `csi-rbd-sc`)
+3. **GitHub App** (recommended) or Personal Access Token with `repo` + `admin:org` scopes
+4. **StorageClass** configured (default: `csi-rbd-sc` for AMD64, `local-path` for ARM64)
+
+## Setup
+
+### Clone Repository
+
+```bash
+git clone https://github.com/ls1intum/theia-arc-runners.git
+cd theia-arc-runners
+```
+
+The `github-actions-cache-server` chart is included as a local subchart (vendored from [falcondev-oss/github-actions-cache-server](https://github.com/falcondev-oss/github-actions-cache-server)).
 
 ## Quick Start (AMD64 / theia-prod)
 
@@ -74,7 +81,7 @@ kubectl create secret generic github-arc-secret \
   --from-literal=github_token="ghp_xxxxxxxxxxxxxxxxxxxx"
 ```
 
-### Step 2: Deploy Part 1 — Controller + Build Caches
+### Step 2: Deploy Part 1 — Controller + Cache Server
 
 ```bash
 cd helm-chart/theia-arc-bundle
@@ -88,11 +95,13 @@ helm install theia-arc-systems . \
   --timeout 2m
 ```
 
-Verify the controller is running before proceeding:
+Verify the controller and cache server are running before proceeding:
 
 ```bash
 kubectl get pods -n arc-systems
-# Expected: theia-arc-systems-gha-rs-controller-... 1/1 Running
+# Expected: 
+# - theia-arc-systems-gha-rs-controller-... 1/1 Running
+# - github-actions-cache-server-...        1/1 Running
 ```
 
 ### Step 3: Deploy Part 2 — Runners
@@ -101,7 +110,7 @@ kubectl get pods -n arc-systems
 helm install theia-arc-runners . \
   --namespace arc-runners \
   --create-namespace \
-  --set buildCaches.enabled=false \
+  --set cacheServer.enabled=false \
   --set arcController.enabled=false \
   --set arcRunners.enabled=true \
   --wait \
@@ -113,65 +122,18 @@ helm install theia-arc-runners . \
 ```bash
 kubectl get pods -n arc-systems
 kubectl get pods -n arc-runners
-kubectl get pods -n squid
-kubectl get pods -n verdaccio
-kubectl get pods -n registry-mirror
-kubectl get pods -n apt-cacher-ng
 kubectl get autoscalingrunnersets -n arc-runners
+kubectl get pvc -n arc-systems
+# Expected PVC: github-actions-cache-server (200Gi, Bound)
 ```
-
-## Squid CA — Manual Setup (without cert-manager)
-
-By default, the chart creates the Squid CA certificate automatically via cert-manager. On clusters without cert-manager (e.g. parma), set `"build-caches".squid.certManager.enabled: false` in your values file and create the secret manually before running Part 1.
-
-Generate a self-signed RSA 4096 CA and load it into the cluster:
-
-```bash
-# 1. Generate private key and self-signed CA certificate (10-year validity)
-openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
-  -keyout squid-ca.key \
-  -out squid-ca.crt \
-  -subj "/CN=Squid CA/O=Theia/C=DE"
-
-# 2. Create the squid namespace (Part 1 will adopt it via the subchart)
-kubectl create namespace squid
-
-# 3. Load the cert and key into a TLS secret
-kubectl create secret tls squid-ca-cert \
-  --namespace=squid \
-  --cert=squid-ca.crt \
-  --key=squid-ca.key
-
-# 4. Clean up local key material
-rm squid-ca.key squid-ca.crt
-```
-
-Verify the secret exists before deploying Part 1:
-
-```bash
-kubectl get secret squid-ca-cert -n squid
-```
-
-> The secret must be named `squid-ca-cert` (matching `"build-caches".squid.caSecretName`). Squid mounts `tls.crt` and `tls.key` from this secret directly — the field names produced by `kubectl create secret tls` match exactly.
 
 ## ARM64 Cluster (parma)
 
-Use `values-arm64.yaml` as an overlay. It sets `storageClass: local-path`, `nodeSelector: arm64`, smaller PVC sizes, and disables cert-manager (`"build-caches".squid.certManager.enabled: false`) since parma has no cert-manager installed.
-
-### Step 0: Create the Squid CA secret manually
-
-parma has no cert-manager, so the Squid CA must be pre-created before Part 1. See [Manual Squid CA](#squid-ca--manual-setup-without-cert-manager) for the full procedure. The `squid` namespace created there will be adopted by the subchart during Part 1 — you must annotate it so Helm can take ownership:
-
-```bash
-kubectl --context=parma label namespace squid app.kubernetes.io/managed-by=Helm
-kubectl --context=parma annotate namespace squid \
-  meta.helm.sh/release-name=theia-arc-systems \
-  meta.helm.sh/release-namespace=arc-systems
-```
+Use `values-arm64.yaml` as an overlay. It sets `storageClass: local-path`, `nodeSelector: arm64`, and configures ARM64 runners.
 
 ### Step 1: Pre-create the `arc-runners` namespace
 
-Same as the AMD64 flow — the namespace must exist with Helm labels before the GitHub secret can be injected:
+Same as the AMD64 flow:
 
 ```bash
 kubectl --context=parma create namespace arc-runners
@@ -183,7 +145,7 @@ kubectl --context=parma annotate namespace arc-runners \
 
 Then create the GitHub auth secret (see AMD64 Step 1 for secret options).
 
-### Step 2: Deploy Part 1 — Controller + Build Caches
+### Step 2: Deploy Part 1 — Controller + Cache Server
 
 ```bash
 helm install theia-arc-systems . \
@@ -192,12 +154,15 @@ helm install theia-arc-systems . \
   -f values-arm64.yaml \
   --set arcRunnersArm.enabled=false \
   --wait --timeout 2m
+```
 
-# Part 2
+### Step 3: Deploy Part 2 — ARM64 Runners
+
+```bash
 helm install theia-arc-runners . \
   --namespace arc-runners \
   -f values-arm64.yaml \
-  --set buildCaches.enabled=false \
+  --set cacheServer.enabled=false \
   --set arcController.enabled=false \
   --set arcRunnersArm.enabled=true \
   --wait --timeout 2m
@@ -211,12 +176,11 @@ helm install theia-arc-runners . \
 # Step 1: Runners first — ARC gracefully deregisters from GitHub
 helm uninstall theia-arc-runners -n arc-runners
 
-# Step 2: Controller + caches
+# Step 2: Controller + cache server
 helm uninstall theia-arc-systems -n arc-systems
 
 # Step 3: Delete namespaces
 kubectl delete namespace arc-runners arc-systems
-kubectl delete namespace squid verdaccio registry-mirror apt-cacher-ng
 ```
 
 **Warning:** This deletes all PVCs and cached data.
@@ -234,7 +198,7 @@ helm upgrade theia-arc-systems . \
 
 helm upgrade theia-arc-runners . \
   --namespace arc-runners \
-  --set buildCaches.enabled=false \
+  --set cacheServer.enabled=false \
   --set arcController.enabled=false \
   --set arcRunners.enabled=true \
   --wait --timeout 2m
@@ -248,7 +212,8 @@ helm upgrade theia-arc-runners . \
 |-------|---------|-------------|
 | `global.storageClass` | `csi-rbd-sc` | StorageClass for all PVCs |
 | `global.nodeSelector` | `kubernetes.io/arch: amd64` | Node selector for all pods |
-| `buildCaches.enabled` | `true` | Deploy build cache services |
+| `cacheServer.enabled` | `true` | Deploy GitHub Actions Cache Server |
+| `cacheServer.persistentVolumeClaim.storage` | `200Gi` | PVC size for cache data |
 | `arcController.enabled` | `true` | Deploy ARC controller |
 | `arcRunners.enabled` | `true` | Deploy AMD64 runner scale set |
 | `arcRunnersArm.enabled` | `false` | Deploy ARM64 runner scale set |
@@ -256,44 +221,30 @@ helm upgrade theia-arc-runners . \
 | `arcRunners.maxRunners` | `50` | Maximum runners |
 | `arcRunners.githubConfigUrl` | `https://github.com/ls1intum` | GitHub org URL |
 | `arcRunners.githubConfigSecret` | `github-arc-secret` | Name of auth secret in `arc-runners` |
-| `"build-caches".squid.caSecretName` | `squid-ca-cert` | Name of Squid CA secret |
-| `"build-caches".squid.certManager.enabled` | `true` | Auto-generate Squid CA via cert-manager; set `false` on clusters without cert-manager (secret must be pre-created) |
 
 ### Namespace summary
 
 | Namespace | Created by | Contains |
 |-----------|-----------|----------|
-| `arc-systems` | Part 1 (`--create-namespace`) | Controller, Listener pod |
-| `arc-runners` | Manually (pre-created with Helm labels before secret injection) | AutoscalingRunnerSet, Runner pods |
-| `squid` | Part 1 (build-caches subchart) | Squid proxy |
-| `verdaccio` | Part 1 (build-caches subchart) | npm cache |
-| `registry-mirror` | Part 1 (build-caches subchart) | Docker Hub + GHCR mirrors |
-| `apt-cacher-ng` | Part 1 (build-caches subchart) | apt package cache |
+| `arc-systems` | Part 1 (`--create-namespace`) | Controller, Cache Server |
+| `arc-runners` | Manually (pre-created with Helm labels) | AutoscalingRunnerSet, Runner pods |
 
 ## Troubleshooting
 
-### Runners stuck in `Init:0/2`
+### Cache server not accessible from runners
 
-The `wait-for-caches` init container is waiting for a cache service. Check which one:
-
-```bash
-kubectl logs -n arc-runners <runner-pod> -c wait-for-caches
-kubectl get pods -n squid
-kubectl get pods -n verdaccio
-kubectl get pods -n registry-mirror
-kubectl get pods -n apt-cacher-ng
-```
-
-Most common cause: Squid in `CrashLoopBackOff` because the `squid-ca-cert` secret is missing or not yet ready. Verify:
+Verify the cache server service is running:
 
 ```bash
-kubectl get secret squid-ca-cert -n squid
-# If using cert-manager:
-kubectl get certificate squid-ca-cert -n squid
-kubectl describe certificate squid-ca-cert -n squid
+kubectl get svc -n arc-systems github-actions-cache-server
+kubectl logs -n arc-systems -l app.kubernetes.io/name=github-actions-cache-server
 ```
 
-If the secret is absent and cert-manager is not installed, create it manually — see [Manual Squid CA](#squid-ca--manual-setup-without-cert-manager).
+Check runner logs for cache connectivity:
+
+```bash
+kubectl logs -n arc-runners <runner-pod> -c runner
+```
 
 ### Runners don't pick up GitHub Actions jobs
 
@@ -327,13 +278,32 @@ kubectl get autoscalingrunnersets -n arc-runners -o name | xargs -I{} kubectl pa
   --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]'
 ```
 
+### Cache data growing too large
+
+The cache server automatically cleans up entries older than 90 days. To adjust this:
+
+```bash
+helm upgrade theia-arc-systems . \
+  --namespace arc-systems \
+  --set cacheServer.config.cacheCleanupOlderThanDays=30 \
+  --reuse-values
+```
+
+Or increase PVC size:
+
+```bash
+kubectl edit pvc github-actions-cache-server -n arc-systems
+# Edit spec.resources.requests.storage to desired size
+```
+
 ## Chart Dependencies
 
-- **build-caches** (v0.1.0) — local subchart (`charts/build-caches`)
+- **github-actions-cache-server** (v1.0.0) — local subchart (vendored from https://github.com/falcondev-oss/github-actions-cache-server)
 - **gha-runner-scale-set-controller** (v0.9.3) — `ghcr.io/actions/actions-runner-controller-charts`
 - **gha-runner-scale-set** (v0.9.3 × 2) — AMD64 + ARM64 aliases
 
 ## References
 
 - [GitHub Actions Runner Controller](https://github.com/actions/actions-runner-controller)
+- [GitHub Actions Cache Server](https://github.com/falcondev-oss/github-actions-cache-server)
 - [ARC Security Best Practices](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners-with-actions-runner-controller/deploying-runner-scale-sets-with-actions-runner-controller#security-considerations)

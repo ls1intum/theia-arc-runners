@@ -1,6 +1,6 @@
 apiVersion: v2
 name: theia-arc-bundle
-description: GitHub Actions Runner Controller with integrated build cache infrastructure
+description: GitHub Actions Runner Controller for self-hosted runners
 type: application
 version: 0.1.0
 appVersion: "1.0"
@@ -12,12 +12,6 @@ maintainers:
     url: https://github.com/ls1intum
 
 dependencies:
-  # Local subchart for cache infrastructure
-  - name: build-caches
-    version: 0.1.0
-    repository: "file://charts/build-caches"
-    condition: buildCaches.enabled
-
   # External ARC Controller
   - name: gha-runner-scale-set-controller
     version: 0.9.3
@@ -38,3 +32,8 @@ dependencies:
     repository: "oci://ghcr.io/actions/actions-runner-controller-charts"
     alias: arcRunnersArm
     condition: arcRunnersArm.enabled
+
+  # GitHub Actions Cache Server (local subchart from https://github.com/falcondev-oss/github-actions-cache-server)
+  - name: github-actions-cache-server
+    version: 1.0.0
+    condition: cacheServer.enabled

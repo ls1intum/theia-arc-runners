@@ -6,23 +6,6 @@ global:
   nodeSelector:
     kubernetes.io/arch: arm64
 
-buildCaches:
-  enabled: false
-
-"build-caches":
-  dockerMirror:
-    pvcSize: "10Gi"
-  ghcrMirror:
-    pvcSize: "50Gi"
-  verdaccio:
-    pvcSize: "5Gi"
-  aptCacher:
-    pvcSize: "10Gi"
-  squid:
-    pvcSize: "5Gi"
-    certManager:
-      enabled: false
-
 # Disable AMD64 runners
 arcRunners:
   enabled: false
@@ -30,7 +13,6 @@ arcRunners:
 # Enable ARM64 runners
 arcRunnersArm:
   enabled: true
-  # Memory-backed work volume for ARM (faster builds on constrained hardware)
   template:
     spec:
       volumes:
@@ -42,3 +24,10 @@ arcRunnersArm:
           emptyDir: {}
         - name: dind-externals
           emptyDir: {}
+
+cacheServer:
+  enabled: true
+  persistentVolumeClaim:
+    storage: 200Gi
+  nodeSelector:
+    kubernetes.io/arch: arm64
