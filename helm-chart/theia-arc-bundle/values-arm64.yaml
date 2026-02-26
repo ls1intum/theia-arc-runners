@@ -18,6 +18,11 @@ arcRunnersArm:
 
 cache-server:
   enabled: true
+  config:
+    apiBaseUrl: "http://theia-arc-systems-github-actions-cache-server.arc-systems.svc.cluster.local:3000"
+  extraEnv:
+    - name: SKIP_TOKEN_VALIDATION
+      value: "true"
   persistentVolumeClaim:
     storage: 200Gi
   nodeSelector:

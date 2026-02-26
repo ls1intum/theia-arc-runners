@@ -26,7 +26,7 @@ arcRunners:
       serviceAccountName: arc-runner-set-stateless-sa
       initContainers:
         - name: init-dind-externals
-          image: ghcr.io/actions/actions-runner:latest
+          image: ghcr.io/falcondev-oss/actions-runner:latest
           command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
           volumeMounts:
             - name: dind-externals
@@ -48,14 +48,14 @@ arcRunners:
             - name: dind-externals
               mountPath: /home/runner/externals
         - name: runner
-          image: ghcr.io/actions/actions-runner:latest
+          image: ghcr.io/falcondev-oss/actions-runner:latest
           command: ["/home/runner/run.sh"]
           env:
             - name: DOCKER_HOST
               value: unix:///var/run/docker.sock
             - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
               value: "false"
-            - name: ACTIONS_CACHE_URL
+            - name: CUSTOM_ACTIONS_RESULTS_URL
               value: http://theia-arc-systems-github-actions-cache-server.arc-systems.svc.cluster.local:3000/
           volumeMounts:
             - name: work
@@ -93,7 +93,7 @@ arcRunnersArm:
       serviceAccountName: arc-runner-set-stateless-arm-sa
       initContainers:
         - name: init-dind-externals
-          image: ghcr.io/actions/actions-runner:latest
+          image: ghcr.io/falcondev-oss/actions-runner:latest
           command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
           volumeMounts:
             - name: dind-externals
@@ -115,14 +115,14 @@ arcRunnersArm:
             - name: dind-externals
               mountPath: /home/runner/externals
         - name: runner
-          image: ghcr.io/actions/actions-runner:latest
+          image: ghcr.io/falcondev-oss/actions-runner:latest
           command: ["/home/runner/run.sh"]
           env:
             - name: DOCKER_HOST
               value: unix:///var/run/docker.sock
             - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
               value: "false"
-            - name: ACTIONS_CACHE_URL
+            - name: CUSTOM_ACTIONS_RESULTS_URL
               value: http://theia-arc-systems-github-actions-cache-server.arc-systems.svc.cluster.local:3000/
           volumeMounts:
             - name: work
@@ -150,7 +150,8 @@ cache-server:
   enabled: true
   replicaCount: 1
   config:
-    apiBaseUrl: ""
+    # Must include port — the auto-generated default omits it.
+    apiBaseUrl: "http://theia-arc-systems-github-actions-cache-server.arc-systems.svc.cluster.local:3000"
     enableDirectDownloads: false
     cacheCleanupOlderThanDays: 90
     storage:
@@ -161,6 +162,10 @@ cache-server:
       driver: sqlite
       sqlite:
         path: /data/cache-server.db
+  extraEnv:
+    # Cluster-internal only — no external access, minimal security risk.
+    - name: SKIP_TOKEN_VALIDATION
+      value: "true"
   persistentVolumeClaim:
     enabled: true
     accessModes:
