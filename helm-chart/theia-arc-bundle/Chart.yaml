@@ -38,3 +38,10 @@ dependencies:
     version: 1.0.0
     alias: cache-server
     condition: cache-server.enabled
+
+  # Harbor registry (pull-through proxy cache for Docker Hub and GHCR)
+  - name: harbor
+    version: "1.18.2"
+    repository: "https://helm.goharbor.io"
+    alias: harbor
+    condition: harbor.enabled

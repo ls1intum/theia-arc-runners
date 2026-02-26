@@ -1,29 +1,20 @@
-# ARM64-specific values for parma cluster
-# Usage: helm install/upgrade ... -f values.yaml -f values-arm64.yaml
+# ARM64-specific overrides for parma cluster.
+# Usage: helm upgrade ... -f values.yaml -f values-arm64.yaml
 
 global:
-  storageClass: "local-path"
+  storageClass: "longhorn"
   nodeSelector:
     kubernetes.io/arch: arm64
 
-# Disable AMD64 runners
+# On parma, arc-runners namespace is owned by the theia-arc-runners release.
+# Set to false to avoid Helm SSA ownership conflicts on upgrade.
+createNamespaces: false
+
 arcRunners:
   enabled: false
 
-# Enable ARM64 runners
 arcRunnersArm:
   enabled: true
-  template:
-    spec:
-      volumes:
-        - name: work
-          emptyDir:
-            medium: Memory
-            sizeLimit: 30Gi
-        - name: dind-sock
-          emptyDir: {}
-        - name: dind-externals
-          emptyDir: {}
 
 cache-server:
   enabled: true
@@ -31,3 +22,6 @@ cache-server:
     storage: 200Gi
   nodeSelector:
     kubernetes.io/arch: arm64
+
+harbor:
+  enabled: false

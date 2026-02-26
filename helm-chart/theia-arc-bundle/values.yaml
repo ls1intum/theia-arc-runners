@@ -4,6 +4,8 @@ global:
     kubernetes.io/arch: amd64
   tolerations: []
 
+createNamespaces: true
+
 arcController:
   enabled: true
 
@@ -181,3 +183,54 @@ externalSecrets:
     remoteRef:
       key: "github/actions-pat"
       property: "token"
+
+# Harbor pull-through proxy cache for Docker Hub and GHCR.
+# Exposed as NodePort 30080 — no ingress, no TLS, no DNS required.
+# theia-prod runners reach Harbor via in-cluster HTTP: http://harbor.arc-systems.svc.cluster.local:80
+# parma runners reach Harbor cross-cluster via: http://131.159.88.30:30080
+# BuildKit config-inline in the workflow configures the mirror transparently.
+harbor:
+  enabled: true
+  expose:
+    type: nodePort
+    tls:
+      enabled: false
+    nodePort:
+      name: harbor
+      ports:
+        http:
+          port: 80
+          nodePort: 30080
+        https:
+          port: 443
+          nodePort: 30443
+  # externalURL must match the in-cluster service DNS used by BuildKit in the workflow.
+  # Token auth uses the request's Host header (not externalURL), so cross-cluster clients
+  # at 131.159.88.30:30080 also get correct token URLs automatically.
+  externalURL: http://harbor.arc-systems.svc.cluster.local:80
+  persistence:
+    enabled: true
+    persistentVolumeClaim:
+      registry:
+        storageClass: csi-rbd-sc
+        accessMode: ReadWriteOnce
+        size: 100Gi
+      jobservice:
+        jobLog:
+          storageClass: csi-rbd-sc
+          accessMode: ReadWriteOnce
+          size: 5Gi
+      database:
+        storageClass: csi-rbd-sc
+        accessMode: ReadWriteOnce
+        size: 5Gi
+      redis:
+        storageClass: csi-rbd-sc
+        accessMode: ReadWriteOnce
+        size: 1Gi
+  trivy:
+    enabled: false
+  notary:
+    enabled: false
+  chartmuseum:
+    enabled: false
