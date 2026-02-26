@@ -55,7 +55,7 @@ arcRunners:
               value: unix:///var/run/docker.sock
             - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
               value: "false"
-            - name: CUSTOM_ACTIONS_RESULTS_URL
+            - name: ACTIONS_RESULTS_URL
               value: http://theia-arc-systems-github-actions-cache-server.arc-systems.svc.cluster.local:3000/
           volumeMounts:
             - name: work
@@ -122,7 +122,7 @@ arcRunnersArm:
               value: unix:///var/run/docker.sock
             - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
               value: "false"
-            - name: CUSTOM_ACTIONS_RESULTS_URL
+            - name: ACTIONS_RESULTS_URL
               value: http://theia-arc-systems-github-actions-cache-server.arc-systems.svc.cluster.local:3000/
           volumeMounts:
             - name: work
