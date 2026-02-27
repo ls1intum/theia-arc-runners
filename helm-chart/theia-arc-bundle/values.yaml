@@ -57,6 +57,14 @@ arcRunners:
               value: "false"
             - name: ACTIONS_RESULTS_URL
               value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
+            # The falcondev runner reads CUSTOM_ACTIONS_RESULTS_URL from the
+            # system environment and uses it to override the GitHub-provided
+            # ACTIONS_RESULTS_URL before passing it to actions.  Without this,
+            # the runner binary replaces our pod-level ACTIONS_RESULTS_URL with
+            # GitHub's own ResultsServiceUrl, so cache traffic goes to GitHub
+            # instead of our self-hosted cache server.
+            - name: CUSTOM_ACTIONS_RESULTS_URL
+              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
           volumeMounts:
             - name: work
               mountPath: /home/runner/_work
@@ -123,6 +131,8 @@ arcRunnersArm:
             - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
               value: "false"
             - name: ACTIONS_RESULTS_URL
+              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
+            - name: CUSTOM_ACTIONS_RESULTS_URL
               value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
           volumeMounts:
             - name: work
