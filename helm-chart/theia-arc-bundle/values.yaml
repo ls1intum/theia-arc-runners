@@ -56,7 +56,7 @@ arcRunners:
             - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
               value: "false"
             - name: ACTIONS_RESULTS_URL
-              value: http://theia-arc-systems-github-actions-cache-server.arc-systems.svc.cluster.local:3000/
+              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
           volumeMounts:
             - name: work
               mountPath: /home/runner/_work
@@ -123,7 +123,7 @@ arcRunnersArm:
             - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
               value: "false"
             - name: ACTIONS_RESULTS_URL
-              value: http://theia-arc-systems-github-actions-cache-server.arc-systems.svc.cluster.local:3000/
+              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
           volumeMounts:
             - name: work
               mountPath: /home/runner/_work
@@ -151,7 +151,7 @@ cache-server:
   replicaCount: 1
   config:
     # Must include port — the auto-generated default omits it.
-    apiBaseUrl: "http://theia-arc-systems-github-actions-cache-server.arc-systems.svc.cluster.local:3000"
+    apiBaseUrl: "http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000"
     enableDirectDownloads: false
     cacheCleanupOlderThanDays: 90
     storage:
