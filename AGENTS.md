@@ -48,6 +48,7 @@ helm upgrade --install theia-arc-runners . \
   --namespace arc-runners \
   --set cacheServer.enabled=false \
   --set arcController.enabled=false \
+  --set harbor.enabled=false \
   --set arcRunners.enabled=true \
   --wait --timeout 2m
 
@@ -57,6 +58,7 @@ helm upgrade --install theia-arc-runners . \
   -f values-arm64.yaml \
   --set cacheServer.enabled=false \
   --set arcController.enabled=false \
+  --set harbor.enabled=false \
   --set arcRunnersArm.enabled=true \
   --wait --timeout 2m
 ```

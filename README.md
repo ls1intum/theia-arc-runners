@@ -4,230 +4,176 @@ Infrastructure-as-code for deploying **GitHub Actions self-hosted runners** usin
 
 ## Architecture
 
-**Stateless runners with Docker Registry v2 pull-through caches** for both Docker Hub and GHCR.
+Stateless runners backed by a **Harbor pull-through proxy cache** (Docker Hub + GHCR) and a **GitHub Actions Cache Server**.
 
-| Cluster | Architecture | Runners | Storage Class |
-|---------|--------------|---------|---------------|
-| theia-prod | AMD64 | `arc-runner-set-stateless` | `csi-rbd-sc` |
-| parma | ARM64 | `arc-runner-set-arm64` | `local-path` |
+| Cluster | Architecture | Runners | Storage Class | Harbor Mirror |
+|---------|--------------|---------|---------------|---------------|
+| theia-prod | AMD64 | `arc-runner-set-stateless` | `csi-rbd-sc` | In-cluster (`harbor.arc-systems.svc.cluster.local:80`) |
+| parma | ARM64 | `arc-runner-set-arm64` | `longhorn` | Cross-cluster NodePort (`131.159.88.30:30080`) |
 
 ## Features
 
-- Stateless Runner Scale Sets that scale 10-50 runners per cluster
-- Docker Registry v2 pull-through caches for `docker.io` and `ghcr.io`
-- Verdaccio npm registry cache for faster `yarn install` / `npm install`
-- apt-cacher-ng for Ubuntu package caching
-- Squid proxy with SSL bumping for HTTPS caching (VSCode extensions)
-- 30-day TTL on cached layers (720h)
-- Cache storage: parma (50GB ghcr, 10GB dockerhub, 5GB npm, 10GB apt), theia-prod (200GB per registry)
-- Memory-backed build cache on parma (30GB per runner, ~1000x faster than disk)
-- BuildKit cache layers pushed to `ghcr.io/.../build-cache`
+- Stateless Runner Scale Sets that scale 10–50 runners per cluster
+- Harbor pull-through proxy cache for `docker.io` and `ghcr.io` (eliminates Docker Hub rate limits)
+- GitHub Actions Cache Server for `actions/cache` compatibility (200Gi PVC)
+- Memory-backed work volume on parma (30Gi RAM per runner, ~1000x faster than disk I/O)
 - Organization-wide runners for `ls1intum` repositories
-
-## Quick Start
-
-### Prerequisites
-
-- `kubectl` configured for target cluster
-- Helm 3.14+
-- `openssl` for generating CA certificates
-- `GITHUB_PAT` environment variable (org admin token)
-
-### One-Time Setup: Squid CA Certificate
-
-Before deploying the Squid proxy for the first time on a cluster, you must generate a self-signed CA certificate for SSL bumping. This certificate is used to intercept and cache HTTPS traffic.
-
-**For theia-prod cluster:**
-```bash
-kubectl config use-context theia-prod
-./scripts/setup-squid-ca.sh
-```
-
-**For parma cluster:**
-```bash
-kubectl config use-context parma
-./scripts/setup-squid-ca.sh
-```
-
-**What it does:**
-- Creates the `squid` namespace if it doesn't exist
-- Generates a self-signed CA certificate (valid for 10 years)
-- Stores the certificate and key in a Kubernetes secret (`squid-ca-cert`)
-- Automatically cleans up temporary files
-
-**Note:** This only needs to be run once per cluster. The script will skip certificate generation if the secret already exists.
-
-### Deploy AMD64 Runners (theia-prod)
-
-```bash
-kubectl config use-context theia-prod
-export GITHUB_PAT="ghp_xxxxxxxxxxxx"
-./scripts/deploy-amd.sh
-```
-
-### Deploy ARM64 Runners (parma)
-
-```bash
-kubectl config use-context parma
-export GITHUB_PAT="ghp_xxxxxxxxxxxx"
-./scripts/deploy-arm.sh
-```
 
 ## Components
 
-### Registry Mirrors
+### Harbor Registry Cache
 
-Each cluster has two Docker Registry v2 instances in `registry-mirror` namespace:
+Harbor is deployed in `arc-systems` on theia-prod only. It proxies both Docker Hub and GHCR transparently:
 
-| Service | Upstream | Internal Address |
-|---------|----------|------------------|
-| `registry-mirror` | docker.io | `registry-mirror.registry-mirror.svc.cluster.local:5000` |
-| `registry-mirror-ghcr` | ghcr.io | `registry-mirror-ghcr.registry-mirror.svc.cluster.local:5000` |
+| Project | Upstream | Pull URL |
+|---------|----------|----------|
+| `dockerhub-proxy` | `registry-1.docker.io` | `harbor.arc-systems.svc.cluster.local:80/dockerhub-proxy/` |
+| `ghcr-proxy` | `ghcr.io` | `harbor.arc-systems.svc.cluster.local:80/ghcr-proxy/` |
 
-The DinD sidecar uses `--registry-mirror` flag to pull through the cache.
+DinD runner pods are configured with `--registry-mirror` so all `docker pull` calls route through Harbor automatically. parma runners reach the same Harbor instance via the NodePort at `131.159.88.30:30080`.
 
-### Verdaccio (npm Cache)
+The `harbor-proxy-setup` Helm hook Job creates these proxy projects automatically on install/upgrade.
 
-Each cluster has a Verdaccio instance in `verdaccio` namespace:
+### GitHub Actions Cache Server
 
-| Service | Upstream | Internal Address |
-|---------|----------|------------------|
-| `verdaccio` | npmjs.org | `http://verdaccio.verdaccio.svc.cluster.local:4873` |
-
-**Usage in Dockerfiles:**
-```dockerfile
-ARG NPM_REGISTRY=https://registry.npmjs.org
-RUN yarn config set registry ${NPM_REGISTRY} && yarn install
-```
-
-Pass `--build-arg NPM_REGISTRY=http://verdaccio.verdaccio.svc.cluster.local:4873` when building on cluster runners.
-
-### apt-cacher-ng (Ubuntu Package Cache)
-
-Each cluster has an apt-cacher-ng instance in `apt-cacher-ng` namespace:
-
-| Service | Purpose | Internal Address |
-|---------|---------|------------------|
-| `apt-cacher-ng` | Debian/Ubuntu packages | `http://apt-cacher-ng.apt-cacher-ng.svc.cluster.local:3142` |
-
-**Usage in Dockerfiles:**
-```dockerfile
-ARG APT_HTTP_PROXY=""
-RUN if [ -n "$APT_HTTP_PROXY" ]; then \
-      echo "Acquire::http::Proxy \"$APT_HTTP_PROXY\";" > /etc/apt/apt.conf.d/01proxy; \
-    fi
-```
-
-Pass `--build-arg APT_HTTP_PROXY=http://apt-cacher-ng.apt-cacher-ng.svc.cluster.local:3142` when building.
-
-### Squid Proxy (HTTPS Caching)
-
-Each cluster has a Squid proxy with SSL bumping in `squid` namespace:
-
-| Service | Purpose | Internal Address |
-|---------|---------|------------------|
-| `squid` | HTTPS caching for VSCode extensions | HTTP: `http://squid.squid.svc.cluster.local:3128`<br>HTTPS: `http://squid.squid.svc.cluster.local:3129` |
-
-**SSL Domains:** `.vsassets.io`, `.visualstudio.com`, `.open-vsx.org`, `.eclipsecontent.org`
-
-**Usage in Dockerfiles:**
-```dockerfile
-ARG HTTPS_PROXY=""
-RUN if [ -n "$HTTPS_PROXY" ]; then \
-      # Download Squid CA certificate
-      curl -o /usr/local/share/ca-certificates/squid-ca.crt http://squid.squid.svc.cluster.local:3128/squid-ca.crt && \
-      update-ca-certificates; \
-    fi
-```
-
-Pass `--build-arg HTTPS_PROXY=http://squid.squid.svc.cluster.local:3129` when building.
+Deployed in `arc-systems`. Runners reference it via `ACTIONS_RESULTS_URL` and `CUSTOM_ACTIONS_RESULTS_URL`. Drop-in replacement for GitHub's hosted cache service, backed by a 200Gi PVC with 90-day cleanup.
 
 ### Runner Configuration
 
-Runners use manual DinD sidecar configuration with:
-- `emptyDir` volumes (stateless)
-- Registry mirror for Docker Hub pulls
-- BuildKit configured via workflow to use GHCR mirror
+Runners use a manual DinD sidecar pattern:
 
-## Manifests
+- `init-dind-externals` — copies runner binaries into a shared volume
+- `dind` — Docker daemon, privileged, with `--registry-mirror` and `--insecure-registry` pointing to Harbor
+- `runner` — `ghcr.io/falcondev-oss/actions-runner:latest`, connects to the daemon via shared Unix socket
 
-| File | Purpose | Cluster |
-|------|---------|---------|
-| `registry-mirror.yaml` | Docker Hub cache | theia-prod |
-| `registry-mirror-ghcr.yaml` | GHCR cache | theia-prod |
-| `registry-mirror-parma.yaml` | Docker Hub cache | parma |
-| `registry-mirror-ghcr-parma.yaml` | GHCR cache | parma |
-| `verdaccio.yaml` | npm cache | theia-prod |
-| `verdaccio-parma.yaml` | npm cache | parma |
-| `apt-cacher-ng.yaml` | apt cache | theia-prod |
-| `apt-cacher-ng-parma.yaml` | apt cache | parma |
-| `squid-cache.yaml` | HTTPS proxy cache | theia-prod |
-| `squid-cache-parma.yaml` | HTTPS proxy cache | parma |
-| `values-runner-set-stateless.yaml` | AMD64 runner config | theia-prod |
-| `values-runner-set-stateless-arm.yaml` | ARM64 runner config | parma |
-| `rbac-runner.yaml` | ServiceAccount for runners | both |
+## Deployment
 
-## Documentation
+See [AGENTS.md](AGENTS.md) for the canonical deploy/upgrade commands.
 
-- [Architecture](docs/ARCHITECTURE_V2.md) - System design and caching strategy
-- [Setup Guide](docs/SETUP.md) - Detailed installation instructions
-- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
+### Prerequisites
 
-## Cleanup and Maintenance
+- `kubectl` configured for target cluster (`theia-prod` or `parma`)
+- Helm 3.14+
+- GitHub auth secret pre-created in `arc-runners` namespace:
 
-### Removing Orphaned Resources
-
-After removing or renaming AutoScalingRunnerSets, some resources may be left behind. Here's how to identify and clean them up:
-
-**1. Check for orphaned AutoScalingRunnerSets:**
 ```bash
-kubectl get autoscalingrunnersets -n arc-runners
+# GitHub App (recommended)
+kubectl create secret generic github-arc-secret \
+  --namespace=arc-runners \
+  --from-literal=github_app_id="<APP_ID>" \
+  --from-literal=github_app_installation_id="<INSTALLATION_ID>" \
+  --from-file=github_app_private_key=<path-to-private-key.pem>
+
+# or Personal Access Token
+kubectl create secret generic github-arc-secret \
+  --namespace=arc-runners \
+  --from-literal=github_token="ghp_xxxxxxxxxxxx"
 ```
 
-**2. Check for orphaned service accounts:**
-```bash
-# List all service accounts
-kubectl get serviceaccounts -n arc-runners
+### Deploy AMD64 (theia-prod)
 
-# Check which service accounts are actively in use
-kubectl get pods -n arc-runners -o jsonpath='{range .items[*]}{.spec.serviceAccountName}{"\n"}{end}' | sort -u
-```
-
-**3. Delete orphaned resources:**
-```bash
-# Delete AutoScalingRunnerSet (will terminate associated pods)
-kubectl delete autoscalingrunnersets <old-runner-set-name> -n arc-runners
-
-# Wait for pods to terminate, then delete service account
-kubectl delete serviceaccount <old-service-account-name> -n arc-runners
-```
-
-**Common orphaned resources:**
-- `arc-runner-set-stateless-arm` — old ARM64 runner set name (replaced by `arc-runner-set-arm64`)
-- Service accounts on the wrong cluster (e.g., ARM64 SA on AMD64 cluster)
-
-### Verifying Active Infrastructure
-
-**Check active runners on theia-prod:**
 ```bash
 kubectl config use-context theia-prod
-kubectl get autoscalingrunnersets -n arc-runners
-kubectl get pods -n arc-runners
+cd helm-chart/theia-arc-bundle
+
+# Part 1: Controller + Cache Server + Harbor
+helm upgrade --install theia-arc-systems . \
+  --namespace arc-systems --create-namespace \
+  --set arcRunners.enabled=false \
+  --set arcRunnersArm.enabled=false \
+  --wait --timeout 2m
+
+# Part 2: Runners (harbor.enabled=false — Harbor is owned by Part 1)
+helm upgrade --install theia-arc-runners . \
+  --namespace arc-runners \
+  --set cacheServer.enabled=false \
+  --set arcController.enabled=false \
+  --set harbor.enabled=false \
+  --set arcRunners.enabled=true \
+  --wait --timeout 2m
 ```
 
-**Check active runners on parma:**
+### Deploy ARM64 (parma)
+
 ```bash
 kubectl config use-context parma
-kubectl get autoscalingrunnersets -n arc-runners
+cd helm-chart/theia-arc-bundle
+
+# Part 1: Controller + Cache Server (no Harbor on parma)
+helm upgrade --install theia-arc-systems . \
+  --namespace arc-systems --create-namespace \
+  -f values-arm64.yaml \
+  --set arcRunnersArm.enabled=false \
+  --wait --timeout 2m
+
+# Part 2: Runners
+helm upgrade --install theia-arc-runners . \
+  --namespace arc-runners \
+  -f values-arm64.yaml \
+  --set cacheServer.enabled=false \
+  --set arcController.enabled=false \
+  --set harbor.enabled=false \
+  --set arcRunnersArm.enabled=true \
+  --wait --timeout 2m
+```
+
+### Verify
+
+```bash
+kubectl get pods -n arc-systems
 kubectl get pods -n arc-runners
+kubectl get autoscalingrunnersets -n arc-runners
+kubectl get pvc -n arc-systems
 ```
 
 Expected AutoScalingRunnerSets:
 - `theia-prod`: `arc-runner-set-stateless`
 - `parma`: `arc-runner-set-arm64`
 
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE_V2.md) — System design and caching strategy
+- [Troubleshooting](docs/TROUBLESHOOTING.md) — Common issues and solutions
+- [Helm Chart README](helm-chart/theia-arc-bundle/README.md) — Chart configuration reference
+
+## Cleanup and Maintenance
+
+### Uninstall (order matters — runners before controller)
+
+```bash
+helm uninstall theia-arc-runners -n arc-runners
+helm uninstall theia-arc-systems -n arc-systems
+kubectl delete namespace arc-runners arc-systems
+```
+
+### Removing Orphaned Resources
+
+```bash
+# Check for orphaned AutoScalingRunnerSets
+kubectl get autoscalingrunnersets -n arc-runners
+
+# Delete orphaned runner set (terminates associated pods)
+kubectl delete autoscalingrunnersets <old-name> -n arc-runners
+
+# Then delete the orphaned service account
+kubectl delete serviceaccount <old-sa-name> -n arc-runners
+```
+
+### Verifying Active Infrastructure
+
+```bash
+# theia-prod
+kubectl --context=theia-prod get autoscalingrunnersets -n arc-runners
+kubectl --context=theia-prod get pods -n arc-runners
+
+# parma
+kubectl --context=parma get autoscalingrunnersets -n arc-runners
+kubectl --context=parma get pods -n arc-runners
+```
+
 ## Related Projects
 
-- [artemis-theia-blueprints](https://github.com/ls1intum/artemis-theia-blueprints) - Theia IDE images
-- [ls1intum/.github](https://github.com/ls1intum/.github) - Reusable workflows with `use-cluster-cache` support
-- [Actions Runner Controller](https://github.com/actions/actions-runner-controller) - Upstream ARC project
+- [artemis-theia-blueprints](https://github.com/ls1intum/artemis-theia-blueprints) — Theia IDE images
+- [ls1intum/.github](https://github.com/ls1intum/.github) — Reusable workflows
+- [Actions Runner Controller](https://github.com/actions/actions-runner-controller) — Upstream ARC project
+- [Harbor](https://goharbor.io/) — Registry proxy cache

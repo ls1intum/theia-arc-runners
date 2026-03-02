@@ -1,157 +1,137 @@
-# Architecture: Stateless CI with Registry Caching
+# Architecture: Stateless CI with Harbor Registry Cache
 
 ## Overview
 
-This architecture runs ephemeral GitHub Actions runners with Docker Registry v2 pull-through caches. Runners are stateless (no PVCs) and scale 0-10 based on job demand.
+Ephemeral GitHub Actions runners backed by a Harbor pull-through proxy cache and a GitHub Actions Cache Server. Runners are stateless (no PVCs) and scale 10–50 based on job demand.
 
 ## Clusters
 
-| Cluster | Context | Architecture | Purpose |
-|---------|---------|--------------|---------|
-| theia-prod | `theia-prod` | AMD64 | General CI, multi-arch manifest creation |
-| parma | `parma` | ARM64 | ARM64 image builds |
+| Cluster | Context | Architecture | Runner Scale Set |
+|---------|---------|--------------|-----------------|
+| theia-prod | `theia-prod` | AMD64 | `arc-runner-set-stateless` |
+| parma | `parma` | ARM64 | `arc-runner-set-arm64` |
 
 ## Components
 
-### 1. Docker Registry v2 Pull-Through Cache
+### 1. Harbor Registry Cache (AMD64 only)
 
-Each cluster runs two registry instances:
+Harbor is deployed in `arc-systems` on theia-prod. It exposes two proxy cache projects:
 
-**Docker Hub Mirror** (`registry-mirror`):
-- Caches pulls from `docker.io`
-- Used by DinD via `--registry-mirror` flag
-- Transparent to `docker pull alpine` commands
+| Project | Upstream | In-cluster pull URL |
+|---------|----------|---------------------|
+| `dockerhub-proxy` | `registry-1.docker.io` | `harbor.arc-systems.svc.cluster.local:80/dockerhub-proxy/` |
+| `ghcr-proxy` | `ghcr.io` | `harbor.arc-systems.svc.cluster.local:80/ghcr-proxy/` |
 
-**GHCR Mirror** (`registry-mirror-ghcr`):
-- Caches pulls from `ghcr.io`
-- Used by BuildKit via registry mirror config
-- Caches base images and build cache layers
+These projects are created automatically by the `harbor-proxy-setup` Helm post-install hook Job on every install/upgrade.
 
-**Configuration:**
-- TTL: 720h (30 days) - cached layers live this long
-- Storage: 200Gi per registry
-- Freshness: Tags checked against upstream on every pull
+Harbor is HTTP-only (no TLS). DinD containers are configured with:
+```
+--registry-mirror=http://<harbor-addr>
+--insecure-registry=<harbor-addr>
+```
 
-### 2. Actions Runner Controller (ARC)
+This makes all `docker pull` calls route through Harbor transparently — workflows do not need any changes.
+
+**parma (ARM64)** has no local Harbor. It reaches theia-prod's Harbor via a Kubernetes NodePort at `131.159.88.30:30080`.
+
+### 2. GitHub Actions Cache Server
+
+Deployed in `arc-systems` alongside the ARC controller. It is a drop-in replacement for GitHub's hosted cache service, compatible with `actions/cache`. Runners reference it via environment variables injected at the runner pod level:
+
+- `ACTIONS_RESULTS_URL`
+- `CUSTOM_ACTIONS_RESULTS_URL`
+
+Backed by a 200Gi PVC. Cache entries older than 90 days are pruned automatically.
+
+### 3. Actions Runner Controller (ARC)
 
 **Mode:** Kubernetes mode with manual DinD sidecar
 
-**Components:**
-- Controller (`arc-systems` namespace): Manages runner lifecycle
-- Listeners: Polls GitHub for jobs
-- Runner pods (`arc-runners` namespace): Ephemeral, created per job
+**Namespace split** (GitHub security best practice):
+- `arc-systems`: ARC controller, listeners, Cache Server, Harbor
+- `arc-runners`: AutoscalingRunnerSet, ephemeral runner pods
 
-**Runner Pod Structure:**
+**Runner pod structure:**
+
 ```
-┌─────────────────────────────────────────┐
-│ Runner Pod                              │
-├─────────────────────────────────────────┤
-│ init: copy externals                    │
-├──────────────────┬──────────────────────┤
-│ dind container   │ runner container     │
-│ - docker daemon  │ - actions runner     │
-│ - registry-mirror│ - DOCKER_HOST=sock   │
-│ - privileged     │ - runs workflow      │
-└──────────────────┴──────────────────────┘
-        │
-        ▼
-  /var/run/docker.sock (emptyDir)
+┌─────────────────────────────────────────────────┐
+│ Runner Pod                                      │
+├─────────────────────────────────────────────────┤
+│ init: init-dind-externals                       │
+│   copies runner binaries → shared emptyDir      │
+├──────────────────────┬──────────────────────────┤
+│ dind container       │ runner container          │
+│ - docker daemon      │ - actions runner binary   │
+│ - privileged         │ - DOCKER_HOST=unix://sock │
+│ - --registry-mirror  │ - runs workflow steps     │
+│   → Harbor           │                           │
+└──────────────────────┴──────────────────────────┘
+         shared volumes:
+           dind-sock   → /var/run        (docker socket)
+           work        → /home/runner    (emptyDir, Memory on ARM64)
+           externals   → runner binaries
 ```
 
-### 3. Caching Strategy
-
-**Layer 1: Registry Pull-Through Cache**
-- Base images (`node:22`, `alpine`, etc.) cached in-cluster
-- ~2-3s pulls vs 30-60s from internet
-- Shared across all runners
-
-**Layer 2: BuildKit Registry Cache**
-- Build layers pushed to `ghcr.io/{org}/{repo}/build-cache`
-- Persists across runner restarts
-- Per-image, keyed by Dockerfile hash
-
-**Layer 3: BuildKit Mount Cache**
-- `--mount=type=cache` for npm/yarn/pip
-- Lives within single build only (emptyDir)
-- Useful for multi-stage builds
+On parma, the work volume uses `emptyDir.medium: Memory` (30Gi) — RAM-backed, ~1000x faster than network storage.
 
 ## Network Flow
 
 ```
-GitHub ─────────────────────────────────────────┐
-   │                                            │
-   │ Job request                                │
-   ▼                                            │
-┌─────────────────────────────────────────────┐ │
-│ Kubernetes Cluster                          │ │
-│                                             │ │
-│  ┌─────────────┐    ┌─────────────────────┐ │ │
-│  │ ARC         │───▶│ Runner Pod          │ │ │
-│  │ Controller  │    │                     │ │ │
-│  └─────────────┘    │  docker pull alpine │ │ │
-│                     │         │           │ │ │
-│                     │         ▼           │ │ │
-│  ┌─────────────────────────────────────┐  │ │ │
-│  │ registry-mirror (Docker Hub cache)  │  │ │ │
-│  │         │                           │  │ │ │
-│  │    ┌────┴────┐                      │  │ │ │
-│  │  Cache    Upstream                  │  │ │ │
-│  │   HIT      MISS                     │  │ │ │
-│  │    │         │                      │  │ │ │
-│  │    ▼         ▼                      │  │ │ │
-│  │  Return   Fetch ──────────────────────────┼───▶ registry-1.docker.io
-│  │           Cache                     │  │ │ │
-│  │           Return                    │  │ │ │
-│  └─────────────────────────────────────┘  │ │ │
-│                     │                     │ │ │
-│                     ▼                     │ │ │
-│                   Image                   │ │ │
-│                     │                     │ │ │
-│                     ▼                     │ │ │
-│              Workflow step                │◀┘ │
-│                     │                     │   │
-│                     ▼                     │   │
-│              Push to GHCR ────────────────────▶ ghcr.io
-└─────────────────────────────────────────────┘
+GitHub
+  │  job request
+  ▼
+ARC Controller (arc-systems)
+  │  creates runner pod
+  ▼
+Runner Pod (arc-runners)
+  │  docker pull alpine
+  ▼
+dind container
+  │  --registry-mirror → Harbor
+  ▼
+Harbor (arc-systems)
+  ├── cache HIT  → return cached layer immediately
+  └── cache MISS → fetch from registry-1.docker.io, cache, return
 ```
 
-## Deployment
+## Helm Deployment Model
 
-### AMD64 (theia-prod)
+The chart is deployed in **two separate Helm releases** because Helm 3 cannot deploy subcharts into different namespaces in one release:
 
-```bash
-kubectl config use-context theia-prod
-./scripts/deploy-amd.sh stateless
-```
+| Release | Namespace | Contains |
+|---------|-----------|----------|
+| `theia-arc-systems` | `arc-systems` | ARC controller, Cache Server, Harbor |
+| `theia-arc-runners` | `arc-runners` | AutoscalingRunnerSet only |
 
-### ARM64 (parma)
+> **The Part 1 release name must be `theia-arc-systems`** — the controller ServiceAccount is named `theia-arc-systems-gha-rs-controller` and Part 2 references it by that exact name.
 
-```bash
-kubectl config use-context parma
-./scripts/deploy-arm.sh arm64
-```
+> **Part 2 must always pass `--set harbor.enabled=false`** — Harbor is owned by the `theia-arc-systems` release in `arc-systems`. If omitted, Helm tries to create the Harbor NodePort in `arc-runners` and fails with "port already allocated".
+
+## Storage
+
+| Resource | Namespace | Size | Storage Class |
+|----------|-----------|------|---------------|
+| `github-actions-cache-server` PVC | `arc-systems` | 200Gi | `csi-rbd-sc` (AMD64) / `longhorn` (ARM64) |
+| Harbor core PVC | `arc-systems` | 10Gi | `csi-rbd-sc` |
+| Harbor registry PVC | `arc-systems` | 200Gi | `csi-rbd-sc` |
+
+Harbor is AMD64 only — parma has no local Harbor PVCs.
 
 ## Verification
 
 ```bash
-# Check registry mirrors
-kubectl get pods -n registry-mirror
-
-# Check ARC controller
+# ARC controller and cache server
 kubectl get pods -n arc-systems
 
-# Check runners
+# Runner scale sets
+kubectl get autoscalingrunnersets -n arc-runners
+
+# Active runner pods (scale from 0 when jobs arrive)
 kubectl get pods -n arc-runners
 
-# Test cache hit
-kubectl exec -it deploy/registry-mirror -n registry-mirror -- \
-  wget -qO- http://localhost:5000/v2/_catalog
+# PVCs
+kubectl get pvc -n arc-systems
+
+# Harbor proxy projects
+kubectl logs -n arc-systems -l job-name=harbor-proxy-setup
 ```
-
-## Why Not Harbor/Spegel?
-
-**Harbor:** Architecturally incompatible with `--registry-mirror`. Harbor's proxy cache requires explicit project paths (`harbor.example.com/dockerhub/library/alpine`) but `--registry-mirror` expects transparent proxying. Result: every request was a cache miss.
-
-**Spegel:** P2P cache that requires containerd runtime modifications. On RKE2 clusters, this conflicts with embedded-registry feature and caused pod scheduling failures.
-
-**Docker Registry v2:** Simple, lightweight, fully compatible with `--registry-mirror`. Single binary, no complex setup.

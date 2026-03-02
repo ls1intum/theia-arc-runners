@@ -6,11 +6,16 @@ Production-grade Helm umbrella chart for GitHub Actions Runner Controller (ARC) 
 
 This chart deploys a complete ARC setup with integrated caching:
 
-- **GitHub Actions Cache Server** (git submodule):
+- **GitHub Actions Cache Server** (vendored subchart):
   - Drop-in replacement for GitHub's hosted cache service
   - Compatible with official `actions/cache` action
   - Persistent storage backend (filesystem + SQLite)
   - 200GB PVC per cluster
+
+- **Harbor Registry** (AMD64 only):
+  - Pull-through proxy cache for Docker Hub (`dockerhub-proxy`) and GHCR (`ghcr-proxy`)
+  - Eliminates Docker Hub rate limit errors on self-hosted runners
+  - DinD containers configured with `--registry-mirror` pointing to Harbor
 
 - **ARC Components** (external charts):
   - gha-runner-scale-set-controller (v0.9.3)
@@ -34,7 +39,7 @@ The solution is to deploy the **same chart twice** using feature flags:
 1. **Kubernetes cluster** (v1.23+)
 2. **Helm** (v3.8+)
 3. **GitHub App** (recommended) or Personal Access Token with `repo` + `admin:org` scopes
-4. **StorageClass** configured (default: `csi-rbd-sc` for AMD64, `local-path` for ARM64)
+4. **StorageClass** configured (default: `csi-rbd-sc` for AMD64, `longhorn` for ARM64)
 
 ## Setup
 
@@ -112,6 +117,7 @@ helm install theia-arc-runners . \
   --create-namespace \
   --set cacheServer.enabled=false \
   --set arcController.enabled=false \
+  --set harbor.enabled=false \
   --set arcRunners.enabled=true \
   --wait \
   --timeout 2m
@@ -164,6 +170,7 @@ helm install theia-arc-runners . \
   -f values-arm64.yaml \
   --set cacheServer.enabled=false \
   --set arcController.enabled=false \
+  --set harbor.enabled=false \
   --set arcRunnersArm.enabled=true \
   --wait --timeout 2m
 ```
@@ -200,6 +207,7 @@ helm upgrade theia-arc-runners . \
   --namespace arc-runners \
   --set cacheServer.enabled=false \
   --set arcController.enabled=false \
+  --set harbor.enabled=false \
   --set arcRunners.enabled=true \
   --wait --timeout 2m
 ```
@@ -217,6 +225,7 @@ helm upgrade theia-arc-runners . \
 | `arcController.enabled` | `true` | Deploy ARC controller |
 | `arcRunners.enabled` | `true` | Deploy AMD64 runner scale set |
 | `arcRunnersArm.enabled` | `false` | Deploy ARM64 runner scale set |
+| `harbor.enabled` | `true` | Deploy Harbor registry (AMD64 only; disable in Part 2) |
 | `arcRunners.minRunners` | `10` | Minimum idle runners |
 | `arcRunners.maxRunners` | `50` | Maximum runners |
 | `arcRunners.githubConfigUrl` | `https://github.com/ls1intum` | GitHub org URL |
@@ -230,6 +239,21 @@ helm upgrade theia-arc-runners . \
 | `arc-runners` | Manually (pre-created with Helm labels) | AutoscalingRunnerSet, Runner pods |
 
 ## Troubleshooting
+
+### Docker Hub rate limits / pull failures
+
+Harbor acts as a pull-through cache for Docker Hub. If runners still hit rate limits:
+
+```bash
+# Verify Harbor is running in arc-systems
+kubectl get pods -n arc-systems | grep harbor
+
+# Check dind args include --registry-mirror
+kubectl get pod -n arc-runners <runner-pod> -o jsonpath='{.spec.containers[?(@.name=="dind")].args}'
+
+# Check Harbor proxy project exists
+kubectl logs -n arc-systems -l app.kubernetes.io/name=harbor-proxy-setup
+```
 
 ### Cache server not accessible from runners
 
@@ -299,6 +323,7 @@ kubectl edit pvc github-actions-cache-server -n arc-systems
 ## Chart Dependencies
 
 - **github-actions-cache-server** (v1.0.0) — local subchart (vendored from https://github.com/falcondev-oss/github-actions-cache-server)
+- **harbor** (v1.18.2) — pull-through proxy cache for Docker Hub + GHCR (AMD64 only)
 - **gha-runner-scale-set-controller** (v0.9.3) — `ghcr.io/actions/actions-runner-controller-charts`
 - **gha-runner-scale-set** (v0.9.3 × 2) — AMD64 + ARM64 aliases
 
@@ -306,4 +331,5 @@ kubectl edit pvc github-actions-cache-server -n arc-systems
 
 - [GitHub Actions Runner Controller](https://github.com/actions/actions-runner-controller)
 - [GitHub Actions Cache Server](https://github.com/falcondev-oss/github-actions-cache-server)
+- [Harbor Registry](https://goharbor.io/)
 - [ARC Security Best Practices](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners-with-actions-runner-controller/deploying-runner-scale-sets-with-actions-runner-controller#security-considerations)
