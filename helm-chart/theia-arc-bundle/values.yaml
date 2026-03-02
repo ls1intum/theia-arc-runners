@@ -38,6 +38,11 @@ arcRunners:
             - dockerd
             - --host=unix:///var/run/docker.sock
             - --group=1001
+            # Route docker.io pulls through Harbor proxy cache to avoid Docker Hub rate limits.
+            # Harbor is deployed in arc-systems and has a dockerhub-proxy project configured.
+            - --registry-mirror=http://harbor.arc-systems.svc.cluster.local:80
+            # Harbor is HTTP-only (no TLS), so mark it as an insecure registry.
+            - --insecure-registry=harbor.arc-systems.svc.cluster.local:80
           securityContext:
             privileged: true
           volumeMounts:
@@ -113,6 +118,9 @@ arcRunnersArm:
             - dockerd
             - --host=unix:///var/run/docker.sock
             - --group=1001
+            # Route docker.io pulls through theia-prod Harbor NodePort reachable cross-cluster.
+            - --registry-mirror=http://131.159.88.30:30080
+            - --insecure-registry=131.159.88.30:30080
           securityContext:
             privileged: true
           volumeMounts:
