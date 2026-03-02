@@ -1,0 +1,32 @@
+# ARM64-specific overrides for parma cluster.
+# Usage: helm upgrade ... -f values.yaml -f values-arm64.yaml
+
+global:
+  storageClass: "longhorn"
+  nodeSelector:
+    kubernetes.io/arch: arm64
+
+# On parma, arc-runners namespace is owned by the theia-arc-runners release.
+# Set to false to avoid Helm SSA ownership conflicts on upgrade.
+createNamespaces: false
+
+arcRunners:
+  enabled: false
+
+arcRunnersArm:
+  enabled: true
+
+cache-server:
+  enabled: true
+  config:
+    apiBaseUrl: "http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000"
+  extraEnv:
+    - name: SKIP_TOKEN_VALIDATION
+      value: "true"
+  persistentVolumeClaim:
+    storage: 200Gi
+  nodeSelector:
+    kubernetes.io/arch: arm64
+
+harbor:
+  enabled: false

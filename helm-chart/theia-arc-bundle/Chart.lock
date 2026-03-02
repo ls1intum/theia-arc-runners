@@ -1,0 +1,18 @@
+dependencies:
+- name: gha-runner-scale-set-controller
+  repository: oci://ghcr.io/actions/actions-runner-controller-charts
+  version: 0.9.3
+- name: gha-runner-scale-set
+  repository: oci://ghcr.io/actions/actions-runner-controller-charts
+  version: 0.9.3
+- name: gha-runner-scale-set
+  repository: oci://ghcr.io/actions/actions-runner-controller-charts
+  version: 0.9.3
+- name: github-actions-cache-server
+  repository: ""
+  version: 1.0.0
+- name: harbor
+  repository: https://helm.goharbor.io
+  version: 1.18.2
+digest: sha256:a8fb3c9a1c124120bb98eb06c3b0b8445676c2b0df6d8ec694bd9862548ae171
+generated: "2026-02-26T12:00:20.084981+01:00"

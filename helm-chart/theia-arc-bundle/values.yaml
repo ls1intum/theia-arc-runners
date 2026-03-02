@@ -1,0 +1,251 @@
+global:
+  storageClass: "csi-rbd-sc"
+  nodeSelector:
+    kubernetes.io/arch: amd64
+  tolerations: []
+
+createNamespaces: true
+
+arcController:
+  enabled: true
+
+arcRunners:
+  enabled: true
+  githubConfigUrl: "https://github.com/ls1intum"
+  githubConfigSecret: "github-arc-secret"
+  minRunners: 10
+  maxRunners: 50
+  runnerScaleSetName: "arc-runner-set-stateless"
+  controllerServiceAccount:
+    namespace: arc-systems
+    # This must match <Part-1-release-name>-gha-rs-controller.
+    # Part 1 MUST be deployed with: helm install theia-arc-systems ...
+    name: theia-arc-systems-gha-rs-controller
+  template:
+    spec:
+      serviceAccountName: arc-runner-set-stateless-sa
+      initContainers:
+        - name: init-dind-externals
+          image: ghcr.io/falcondev-oss/actions-runner:latest
+          command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
+          volumeMounts:
+            - name: dind-externals
+              mountPath: /home/runner/tmpDir
+      containers:
+        - name: dind
+          image: docker:dind
+          args:
+            - dockerd
+            - --host=unix:///var/run/docker.sock
+            - --group=1001
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: work
+              mountPath: /home/runner/_work
+            - name: dind-sock
+              mountPath: /var/run
+            - name: dind-externals
+              mountPath: /home/runner/externals
+        - name: runner
+          image: ghcr.io/falcondev-oss/actions-runner:latest
+          command: ["/home/runner/run.sh"]
+          env:
+            - name: DOCKER_HOST
+              value: unix:///var/run/docker.sock
+            - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
+              value: "false"
+            - name: ACTIONS_RESULTS_URL
+              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
+            # The falcondev runner reads CUSTOM_ACTIONS_RESULTS_URL from the
+            # system environment and uses it to override the GitHub-provided
+            # ACTIONS_RESULTS_URL before passing it to actions.  Without this,
+            # the runner binary replaces our pod-level ACTIONS_RESULTS_URL with
+            # GitHub's own ResultsServiceUrl, so cache traffic goes to GitHub
+            # instead of our self-hosted cache server.
+            - name: CUSTOM_ACTIONS_RESULTS_URL
+              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
+          volumeMounts:
+            - name: work
+              mountPath: /home/runner/_work
+            - name: dind-sock
+              mountPath: /var/run
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 4000m
+              memory: 8Gi
+      volumes:
+        - name: work
+          emptyDir: {}
+        - name: dind-sock
+          emptyDir: {}
+        - name: dind-externals
+          emptyDir: {}
+
+arcRunnersArm:
+  enabled: false
+  githubConfigUrl: "https://github.com/ls1intum"
+  githubConfigSecret: "github-arc-secret"
+  minRunners: 10
+  maxRunners: 50
+  runnerScaleSetName: "arc-runner-set-arm64"
+  controllerServiceAccount:
+    namespace: arc-systems
+    # Must match <Part-1-release-name>-gha-rs-controller (release name must be theia-arc-systems)
+    name: theia-arc-systems-gha-rs-controller
+  template:
+    spec:
+      serviceAccountName: arc-runner-set-stateless-arm-sa
+      initContainers:
+        - name: init-dind-externals
+          image: ghcr.io/falcondev-oss/actions-runner:latest
+          command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
+          volumeMounts:
+            - name: dind-externals
+              mountPath: /home/runner/tmpDir
+      containers:
+        - name: dind
+          image: docker:dind
+          args:
+            - dockerd
+            - --host=unix:///var/run/docker.sock
+            - --group=1001
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: work
+              mountPath: /home/runner/_work
+            - name: dind-sock
+              mountPath: /var/run
+            - name: dind-externals
+              mountPath: /home/runner/externals
+        - name: runner
+          image: ghcr.io/falcondev-oss/actions-runner:latest
+          command: ["/home/runner/run.sh"]
+          env:
+            - name: DOCKER_HOST
+              value: unix:///var/run/docker.sock
+            - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
+              value: "false"
+            - name: ACTIONS_RESULTS_URL
+              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
+            - name: CUSTOM_ACTIONS_RESULTS_URL
+              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
+          volumeMounts:
+            - name: work
+              mountPath: /home/runner/_work
+            - name: dind-sock
+              mountPath: /var/run
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 4000m
+              memory: 8Gi
+      volumes:
+        - name: work
+          emptyDir:
+            medium: Memory
+            sizeLimit: 30Gi
+        - name: dind-sock
+          emptyDir: {}
+        - name: dind-externals
+          emptyDir: {}
+
+cache-server:
+  enabled: true
+  replicaCount: 1
+  config:
+    # Must include port — the auto-generated default omits it.
+    apiBaseUrl: "http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000"
+    enableDirectDownloads: false
+    cacheCleanupOlderThanDays: 90
+    storage:
+      driver: filesystem
+      filesystem:
+        path: /data/cache
+    db:
+      driver: sqlite
+      sqlite:
+        path: /data/cache-server.db
+  extraEnv:
+    # Cluster-internal only — no external access, minimal security risk.
+    - name: SKIP_TOKEN_VALIDATION
+      value: "true"
+  persistentVolumeClaim:
+    enabled: true
+    accessModes:
+      - ReadWriteOnce
+    storage: 200Gi
+  resources:
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  nodeSelector:
+    kubernetes.io/arch: amd64
+  tolerations: []
+
+externalSecrets:
+  enabled: false
+  secretStore: "vault-backend"
+  githubPat:
+    remoteRef:
+      key: "github/actions-pat"
+      property: "token"
+
+# Harbor pull-through proxy cache for Docker Hub and GHCR.
+# Exposed as NodePort 30080 — no ingress, no TLS, no DNS required.
+# theia-prod runners reach Harbor via in-cluster HTTP: http://harbor.arc-systems.svc.cluster.local:80
+# parma runners reach Harbor cross-cluster via: http://131.159.88.30:30080
+# BuildKit config-inline in the workflow configures the mirror transparently.
+harbor:
+  enabled: true
+  expose:
+    type: nodePort
+    tls:
+      enabled: false
+    nodePort:
+      name: harbor
+      ports:
+        http:
+          port: 80
+          nodePort: 30080
+        https:
+          port: 443
+          nodePort: 30443
+  # externalURL must match the in-cluster service DNS used by BuildKit in the workflow.
+  # Token auth uses the request's Host header (not externalURL), so cross-cluster clients
+  # at 131.159.88.30:30080 also get correct token URLs automatically.
+  externalURL: http://harbor.arc-systems.svc.cluster.local:80
+  persistence:
+    enabled: true
+    persistentVolumeClaim:
+      registry:
+        storageClass: csi-rbd-sc
+        accessMode: ReadWriteOnce
+        size: 100Gi
+      jobservice:
+        jobLog:
+          storageClass: csi-rbd-sc
+          accessMode: ReadWriteOnce
+          size: 5Gi
+      database:
+        storageClass: csi-rbd-sc
+        accessMode: ReadWriteOnce
+        size: 5Gi
+      redis:
+        storageClass: csi-rbd-sc
+        accessMode: ReadWriteOnce
+        size: 1Gi
+  trivy:
+    enabled: false
+  notary:
+    enabled: false
+  chartmuseum:
+    enabled: false

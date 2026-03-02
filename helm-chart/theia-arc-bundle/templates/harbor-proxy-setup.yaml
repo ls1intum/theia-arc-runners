@@ -1,0 +1,80 @@
+{{- if .Values.harbor.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-harbor-proxy-setup
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 10
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: setup
+          image: curlimages/curl:latest
+          env:
+            - name: HARBOR_URL
+              value: "http://harbor.{{ .Release.Namespace }}.svc.cluster.local:80"
+            - name: HARBOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-harbor-core
+                  key: HARBOR_ADMIN_PASSWORD
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              AUTH=$(printf "admin:%s" "$HARBOR_PASSWORD" | base64)
+
+              echo "Waiting for Harbor to be ready..."
+              i=0
+              while [ $i -lt 30 ]; do
+                STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "${HARBOR_URL}/api/v2.0/health" 2>/dev/null || echo "000")
+                [ "$STATUS" = "200" ] && echo "Harbor ready." && break
+                i=$((i+1))
+                echo "Attempt $i/30 (status=$STATUS), retrying in 10s..."
+                sleep 10
+              done
+              [ "$STATUS" != "200" ] && echo "Harbor did not become ready." && exit 1
+
+              create_registry() {
+                NAME=$1; URL=$2; TYPE=$3
+                EXISTS=$(curl -sf -H "Authorization: Basic ${AUTH}" \
+                  "${HARBOR_URL}/api/v2.0/registries?name=${NAME}" \
+                  | grep -c "\"name\":\"${NAME}\"" 2>/dev/null || true)
+                if [ "${EXISTS:-0}" != "0" ]; then echo "Registry '${NAME}' exists, skipping."; return 0; fi
+                curl -sf -X POST "${HARBOR_URL}/api/v2.0/registries" \
+                  -H "Authorization: Basic ${AUTH}" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"name\":\"${NAME}\",\"type\":\"${TYPE}\",\"url\":\"${URL}\"}"
+                echo "Registry '${NAME}' created."
+              }
+
+              create_proxy_project() {
+                PROJECT=$1; REGISTRY=$2
+                EXISTS=$(curl -sf -H "Authorization: Basic ${AUTH}" \
+                  "${HARBOR_URL}/api/v2.0/projects?name=${PROJECT}" \
+                  | grep -c "\"name\":\"${PROJECT}\"" 2>/dev/null || true)
+                if [ "${EXISTS:-0}" != "0" ]; then echo "Project '${PROJECT}' exists, skipping."; return 0; fi
+                REG_ID=$(curl -sf -H "Authorization: Basic ${AUTH}" \
+                  "${HARBOR_URL}/api/v2.0/registries?name=${REGISTRY}" \
+                  | grep -o '"id":[0-9]*' | head -1 | grep -o '[0-9]*')
+                curl -sf -X POST "${HARBOR_URL}/api/v2.0/projects" \
+                  -H "Authorization: Basic ${AUTH}" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"project_name\":\"${PROJECT}\",\"public\":true,\"registry_id\":${REG_ID},\"metadata\":{\"proxy_cache\":\"true\"}}"
+                echo "Project '${PROJECT}' created."
+              }
+
+              create_registry "dockerhub" "https://registry-1.docker.io" "docker-hub"
+              create_registry "ghcr"      "https://ghcr.io"              "github-ghcr"
+              create_proxy_project "dockerhub-proxy" "dockerhub"
+              create_proxy_project "ghcr-proxy"      "ghcr"
+              echo "Harbor proxy setup complete."
+{{- end }}

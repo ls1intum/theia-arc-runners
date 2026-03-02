@@ -9,7 +9,7 @@ Infrastructure-as-code for deploying **GitHub Actions self-hosted runners** usin
 | Cluster | Architecture | Runners | Storage Class |
 |---------|--------------|---------|---------------|
 | theia-prod | AMD64 | `arc-runner-set-stateless` | `csi-rbd-sc` |
-| parma | ARM64 | `arc-runner-set-stateless-arm` | `local-path` |
+| parma | ARM64 | `arc-runner-set-arm64` | `local-path` |
 
 ## Features
 
@@ -203,7 +203,7 @@ kubectl delete serviceaccount <old-service-account-name> -n arc-runners
 ```
 
 **Common orphaned resources:**
-- `arc-runner-set-arm64` and `arc-runner-set-arm64-sa` - Old ARM64 runner set (replaced by `arc-runner-set-stateless-arm`)
+- `arc-runner-set-stateless-arm` — old ARM64 runner set name (replaced by `arc-runner-set-arm64`)
 - Service accounts on the wrong cluster (e.g., ARM64 SA on AMD64 cluster)
 
 ### Verifying Active Infrastructure
@@ -224,7 +224,7 @@ kubectl get pods -n arc-runners
 
 Expected AutoScalingRunnerSets:
 - `theia-prod`: `arc-runner-set-stateless`
-- `parma`: `arc-runner-set-stateless-arm`
+- `parma`: `arc-runner-set-arm64`
 
 ## Related Projects
 
