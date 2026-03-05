@@ -39,9 +39,9 @@ dependencies:
     alias: cache-server
     condition: cache-server.enabled
 
-  # Harbor registry (pull-through proxy cache for Docker Hub and GHCR)
-  - name: harbor
-    version: "1.18.2"
-    repository: "https://helm.goharbor.io"
-    alias: harbor
-    condition: harbor.enabled
+  # Zot registry (pull-through proxy cache for Docker Hub)
+  - name: zot
+    version: "0.1.98"
+    repository: "https://zotregistry.dev/helm-charts"
+    alias: zot
+    condition: zot.enabled

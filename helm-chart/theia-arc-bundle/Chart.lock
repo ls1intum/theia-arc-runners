@@ -11,8 +11,8 @@ dependencies:
 - name: github-actions-cache-server
   repository: ""
   version: 1.0.0
-- name: harbor
-  repository: https://helm.goharbor.io
-  version: 1.18.2
-digest: sha256:a8fb3c9a1c124120bb98eb06c3b0b8445676c2b0df6d8ec694bd9862548ae171
-generated: "2026-02-26T12:00:20.084981+01:00"
+- name: zot
+  repository: https://zotregistry.dev/helm-charts
+  version: 0.1.98
+digest: sha256:aac6e61d899a14feba90477d12e757dcbefdd31a849ea23c64d99c49bbd6a1a6
+generated: "2026-03-03T11:37:10.853008+01:00"
