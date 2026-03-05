@@ -28,5 +28,5 @@ cache-server:
   nodeSelector:
     kubernetes.io/arch: arm64
 
-harbor:
+zot:
   enabled: false

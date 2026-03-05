@@ -38,11 +38,11 @@ arcRunners:
             - dockerd
             - --host=unix:///var/run/docker.sock
             - --group=1001
-            # Route docker.io pulls through Harbor proxy cache to avoid Docker Hub rate limits.
-            # Harbor is deployed in arc-systems and has a dockerhub-proxy project configured.
-            - --registry-mirror=http://harbor.arc-systems.svc.cluster.local:80
-            # Harbor is HTTP-only (no TLS), so mark it as an insecure registry.
-            - --insecure-registry=harbor.arc-systems.svc.cluster.local:80
+            # Route docker.io pulls through Zot pull-through cache to avoid Docker Hub rate limits.
+            # Zot is deployed in arc-systems and proxies registry-1.docker.io on-demand.
+            - --registry-mirror=http://theia-arc-systems-zot.arc-systems.svc.cluster.local:5000
+            # Zot is HTTP-only (no TLS), so mark it as an insecure registry.
+            - --insecure-registry=theia-arc-systems-zot.arc-systems.svc.cluster.local:5000
           securityContext:
             privileged: true
           volumeMounts:
@@ -118,9 +118,9 @@ arcRunnersArm:
             - dockerd
             - --host=unix:///var/run/docker.sock
             - --group=1001
-            # Route docker.io pulls through theia-prod Harbor NodePort reachable cross-cluster.
-            - --registry-mirror=http://131.159.88.30:30080
-            - --insecure-registry=131.159.88.30:30080
+            # Route docker.io pulls through theia-prod Zot NodePort reachable cross-cluster.
+            - --registry-mirror=http://131.159.88.30:30081
+            - --insecure-registry=131.159.88.30:30081
           securityContext:
             privileged: true
           volumeMounts:
@@ -189,6 +189,7 @@ cache-server:
     accessModes:
       - ReadWriteOnce
     storage: 200Gi
+    storageClassName: longhorn
   resources:
     limits:
       memory: 4Gi
@@ -207,53 +208,90 @@ externalSecrets:
       key: "github/actions-pat"
       property: "token"
 
-# Harbor pull-through proxy cache for Docker Hub and GHCR.
-# Exposed as NodePort 30080 — no ingress, no TLS, no DNS required.
-# theia-prod runners reach Harbor via in-cluster HTTP: http://harbor.arc-systems.svc.cluster.local:80
-# parma runners reach Harbor cross-cluster via: http://131.159.88.30:30080
-# BuildKit config-inline in the workflow configures the mirror transparently.
-harbor:
+# Zot pull-through cache for Docker Hub.
+# Deployed in arc-systems on theia-prod only.
+# theia-prod runners: http://theia-arc-systems-zot.arc-systems.svc.cluster.local:5000
+# parma runners:      http://131.159.88.30:30081 (NodePort on theia-prod node)
+zot:
   enabled: true
-  expose:
-    type: nodePort
-    tls:
-      enabled: false
-    nodePort:
-      name: harbor
-      ports:
-        http:
-          port: 80
-          nodePort: 30080
-        https:
-          port: 443
-          nodePort: 30443
-  # externalURL must match the in-cluster service DNS used by BuildKit in the workflow.
-  # Token auth uses the request's Host header (not externalURL), so cross-cluster clients
-  # at 131.159.88.30:30080 also get correct token URLs automatically.
-  externalURL: http://harbor.arc-systems.svc.cluster.local:80
-  persistence:
-    enabled: true
-    persistentVolumeClaim:
-      registry:
-        storageClass: csi-rbd-sc
-        accessMode: ReadWriteOnce
-        size: 100Gi
-      jobservice:
-        jobLog:
-          storageClass: csi-rbd-sc
-          accessMode: ReadWriteOnce
-          size: 5Gi
-      database:
-        storageClass: csi-rbd-sc
-        accessMode: ReadWriteOnce
-        size: 5Gi
-      redis:
-        storageClass: csi-rbd-sc
-        accessMode: ReadWriteOnce
-        size: 1Gi
-  trivy:
-    enabled: false
-  notary:
-    enabled: false
-  chartmuseum:
-    enabled: false
+  mountConfig: true
+  configFiles:
+    config.json: |-
+      {
+        "distSpecVersion": "1.1.0",
+        "storage": {
+          "rootDirectory": "/var/lib/registry",
+          "gc": true,
+          "gcDelay": "1h",
+          "gcInterval": "6h",
+          "retention": {
+            "policies": [
+              {
+                "repositories": ["**"],
+                "keepTags": [
+                  {
+                    "mostRecentlyPulledCount": 100,
+                    "pulledWithin": "720h"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "http": {
+          "address": "0.0.0.0",
+          "port": "5000"
+        },
+        "log": {
+          "level": "info"
+        },
+        "extensions": {
+          "sync": {
+            "enable": true,
+            "credentialsFile": "/etc/zot-credentials/credentials.json",
+            "registries": [
+              {
+                "urls": ["https://registry-1.docker.io"],
+                "onDemand": true,
+                "tlsVerify": true,
+                "preserveDigest": false,
+                "maxRetries": 3,
+                "retryDelay": "5m",
+                "content": [
+                  {
+                    "prefix": "**"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+  extraVolumes:
+    - name: zot-credentials
+      secret:
+        secretName: zot-dockerhub-credentials
+  extraVolumeMounts:
+    - name: zot-credentials
+      mountPath: /etc/zot-credentials
+      readOnly: true
+  persistence: true
+  pvc:
+    create: true
+    storage: 100Gi
+    storageClassName: "csi-rbd-sc"
+    accessModes:
+      - ReadWriteOnce
+  service:
+    type: NodePort
+    port: 5000
+    nodePort: 30081
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  nodeSelector:
+    kubernetes.io/arch: amd64
