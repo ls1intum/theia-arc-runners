@@ -30,7 +30,7 @@ helm upgrade --install theia-arc-systems . \
   --namespace arc-systems --create-namespace \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
-  --wait --timeout 2m
+  --wait --timeout 5m
 
 # ARM64 (parma) — overlay values-arm64.yaml on top of values.yaml
 helm upgrade --install theia-arc-systems . \
@@ -48,7 +48,7 @@ helm upgrade --install theia-arc-runners . \
   --namespace arc-runners \
   --set cacheServer.enabled=false \
   --set arcController.enabled=false \
-  --set harbor.enabled=false \
+  --set zot.enabled=false \
   --set arcRunners.enabled=true \
   --wait --timeout 2m
 
@@ -58,7 +58,7 @@ helm upgrade --install theia-arc-runners . \
   -f values-arm64.yaml \
   --set cacheServer.enabled=false \
   --set arcController.enabled=false \
-  --set harbor.enabled=false \
+  --set zot.enabled=false \
   --set arcRunnersArm.enabled=true \
   --wait --timeout 2m
 ```
@@ -102,12 +102,11 @@ kubectl delete namespace arc-runners arc-systems
 │       │   ├── _helpers.tpl       # Helm template helpers
 │       │   ├── namespace.yaml     # arc-systems / arc-runners namespaces
 │       │   ├── rbac.yaml          # ServiceAccounts + Role + RoleBindings
-│       │   ├── external-secret-github.yaml  # Optional: ExternalSecrets integration
-│       │   └── harbor-proxy-setup.yaml      # Post-install Job: Harbor proxy projects
+│       │   └── external-secret-github.yaml  # Optional: ExternalSecrets integration
 │       └── charts/
 │           ├── gha-runner-scale-set-0.9.3.tgz
 │           ├── gha-runner-scale-set-controller-0.9.3.tgz
-│           ├── harbor-1.18.2.tgz
+│           ├── zot-0.1.98.tgz
 │           └── github-actions-cache-server/   # Local subchart (vendored)
 ├── .github/workflows/
 │   ├── deploy-manual.yml          # Workflow dispatch trigger
@@ -121,12 +120,12 @@ kubectl delete namespace arc-runners arc-systems
 
 **Two Helm releases must be deployed separately** — Helm 3 cannot deploy subcharts into different namespaces in one release:
 
-- **Part 1** (`theia-arc-systems` release, `arc-systems` ns): ARC controller, GitHub Actions Cache Server, Harbor (AMD64 only)
+- **Part 1** (`theia-arc-systems` release, `arc-systems` ns): ARC controller, GitHub Actions Cache Server, Zot (AMD64 only)
 - **Part 2** (`theia-arc-runners` release, `arc-runners` ns): AutoscalingRunnerSet only
 
 **The Part 1 release name MUST be `theia-arc-systems`** — the controller ServiceAccount is named `theia-arc-systems-gha-rs-controller` and Part 2 references it by exact name in `values.yaml`.
 
-**Registry caching:** Harbor proxy cache (AMD64 only, `harbor.enabled: true` in `values.yaml`). Harbor is **disabled on parma** (`harbor.enabled: false` in `values-arm64.yaml`).
+**Registry caching:** Zot pull-through cache (AMD64 only, `zot.enabled: true` in `values.yaml`). Zot is **disabled on parma** (`zot.enabled: false` in `values-arm64.yaml`). parma runners reach theia-prod's Zot via NodePort `131.159.88.30:30081`.
 
 **Cache server:** `github-actions-cache-server` subchart deployed in `arc-systems`. Runners point to it via `ACTIONS_RESULTS_URL` and `CUSTOM_ACTIONS_RESULTS_URL` env vars.
 
@@ -142,7 +141,7 @@ kubectl delete namespace arc-runners arc-systems
 - `global.nodeSelector` — arch selector applied to all pods
 - `arcController.enabled` / `arcRunners.enabled` / `arcRunnersArm.enabled` — feature flags for split deployment
 - `cache-server.*` — passed to the `github-actions-cache-server` subchart
-- `harbor.*` — passed to the Harbor subchart (AMD64 only)
+- `zot.*` — passed to the Zot subchart (AMD64 only)
 
 ### Helm template style
 
@@ -174,4 +173,4 @@ kubectl delete namespace arc-runners arc-systems
 - **`createNamespaces: false`** on parma (ARM64) — the `arc-runners` namespace is pre-created with Helm ownership labels; Helm SSA will fail if the chart tries to recreate it.
 - **`externalSecrets.enabled: false`** by default — auth secret is created manually or via CI (`kubectl create secret`).
 - docs/ may be out of date — always trust `values.yaml`, `values-arm64.yaml`, and the templates as ground truth.
-- Harbor is only deployed on `theia-prod` (AMD64). parma uses no pull-through cache.
+- Zot is only deployed on `theia-prod` (AMD64). parma runners reach Zot cross-cluster via NodePort `131.159.88.30:30081`.
