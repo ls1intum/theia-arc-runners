@@ -12,10 +12,10 @@ This chart deploys a complete ARC setup with integrated caching:
   - Persistent storage backend (filesystem + SQLite)
   - 200GB PVC per cluster
 
-- **Harbor Registry** (AMD64 only):
-  - Pull-through proxy cache for Docker Hub (`dockerhub-proxy`) and GHCR (`ghcr-proxy`)
+- **Zot Registry** (AMD64 only):
+  - Pull-through cache for Docker Hub
   - Eliminates Docker Hub rate limit errors on self-hosted runners
-  - DinD containers configured with `--registry-mirror` pointing to Harbor
+  - DinD containers configured with `--registry-mirror` pointing to Zot
 
 - **ARC Components** (external charts):
   - gha-runner-scale-set-controller (v0.9.3)
@@ -29,7 +29,7 @@ The solution is to deploy the **same chart twice** using feature flags:
 
 | Command | Release name | Namespace | What gets deployed |
 |---------|-------------|-----------|-------------------|
-| Part 1 | `theia-arc-systems` | `arc-systems` | Controller + Cache Server |
+| Part 1 | `theia-arc-systems` | `arc-systems` | Controller + Cache Server + Zot |
 | Part 2 | `theia-arc-runners` | `arc-runners` | AutoscalingRunnerSet only |
 
 > **Important:** The Part 1 release name **must** be `theia-arc-systems`. The controller creates a ServiceAccount named `<release-name>-gha-rs-controller`, and Part 2 references it by that exact name.
@@ -86,7 +86,7 @@ kubectl create secret generic github-arc-secret \
   --from-literal=github_token="ghp_xxxxxxxxxxxxxxxxxxxx"
 ```
 
-### Step 2: Deploy Part 1 — Controller + Cache Server
+### Step 2: Deploy Part 1 — Controller + Cache Server + Zot
 
 ```bash
 cd helm-chart/theia-arc-bundle
@@ -97,7 +97,7 @@ helm install theia-arc-systems . \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
   --wait \
-  --timeout 2m
+  --timeout 5m
 ```
 
 Verify the controller and cache server are running before proceeding:
@@ -107,6 +107,7 @@ kubectl get pods -n arc-systems
 # Expected: 
 # - theia-arc-systems-gha-rs-controller-... 1/1 Running
 # - github-actions-cache-server-...        1/1 Running
+# - theia-arc-systems-zot-...             1/1 Running
 ```
 
 ### Step 3: Deploy Part 2 — Runners
@@ -117,7 +118,7 @@ helm install theia-arc-runners . \
   --create-namespace \
   --set cacheServer.enabled=false \
   --set arcController.enabled=false \
-  --set harbor.enabled=false \
+  --set zot.enabled=false \
   --set arcRunners.enabled=true \
   --wait \
   --timeout 2m
@@ -130,12 +131,12 @@ kubectl get pods -n arc-systems
 kubectl get pods -n arc-runners
 kubectl get autoscalingrunnersets -n arc-runners
 kubectl get pvc -n arc-systems
-# Expected PVC: github-actions-cache-server (200Gi, Bound)
+# Expected PVCs: github-actions-cache-server (200Gi, Bound), zot (100Gi, Bound)
 ```
 
 ## ARM64 Cluster (parma)
 
-Use `values-arm64.yaml` as an overlay. It sets `storageClass: local-path`, `nodeSelector: arm64`, and configures ARM64 runners.
+Use `values-arm64.yaml` as an overlay. It sets `storageClass: longhorn`, `nodeSelector: arm64`, and configures ARM64 runners. Zot is disabled on parma — ARM64 runners reach theia-prod's Zot via NodePort `131.159.88.30:30081`.
 
 ### Step 1: Pre-create the `arc-runners` namespace
 
@@ -170,7 +171,7 @@ helm install theia-arc-runners . \
   -f values-arm64.yaml \
   --set cacheServer.enabled=false \
   --set arcController.enabled=false \
-  --set harbor.enabled=false \
+  --set zot.enabled=false \
   --set arcRunnersArm.enabled=true \
   --wait --timeout 2m
 ```
@@ -183,7 +184,7 @@ helm install theia-arc-runners . \
 # Step 1: Runners first — ARC gracefully deregisters from GitHub
 helm uninstall theia-arc-runners -n arc-runners
 
-# Step 2: Controller + cache server
+# Step 2: Controller + cache server + Zot
 helm uninstall theia-arc-systems -n arc-systems
 
 # Step 3: Delete namespaces
@@ -201,13 +202,13 @@ helm upgrade theia-arc-systems . \
   --namespace arc-systems \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
-  --wait --timeout 2m
+  --wait --timeout 5m
 
 helm upgrade theia-arc-runners . \
   --namespace arc-runners \
   --set cacheServer.enabled=false \
   --set arcController.enabled=false \
-  --set harbor.enabled=false \
+  --set zot.enabled=false \
   --set arcRunners.enabled=true \
   --wait --timeout 2m
 ```
@@ -225,7 +226,7 @@ helm upgrade theia-arc-runners . \
 | `arcController.enabled` | `true` | Deploy ARC controller |
 | `arcRunners.enabled` | `true` | Deploy AMD64 runner scale set |
 | `arcRunnersArm.enabled` | `false` | Deploy ARM64 runner scale set |
-| `harbor.enabled` | `true` | Deploy Harbor registry (AMD64 only; disable in Part 2) |
+| `zot.enabled` | `true` | Deploy Zot registry cache (AMD64 only; disable in Part 2) |
 | `arcRunners.minRunners` | `10` | Minimum idle runners |
 | `arcRunners.maxRunners` | `50` | Maximum runners |
 | `arcRunners.githubConfigUrl` | `https://github.com/ls1intum` | GitHub org URL |
@@ -235,24 +236,24 @@ helm upgrade theia-arc-runners . \
 
 | Namespace | Created by | Contains |
 |-----------|-----------|----------|
-| `arc-systems` | Part 1 (`--create-namespace`) | Controller, Cache Server |
+| `arc-systems` | Part 1 (`--create-namespace`) | Controller, Cache Server, Zot |
 | `arc-runners` | Manually (pre-created with Helm labels) | AutoscalingRunnerSet, Runner pods |
 
 ## Troubleshooting
 
 ### Docker Hub rate limits / pull failures
 
-Harbor acts as a pull-through cache for Docker Hub. If runners still hit rate limits:
+Zot acts as a pull-through cache for Docker Hub. If runners still hit rate limits:
 
 ```bash
-# Verify Harbor is running in arc-systems
-kubectl get pods -n arc-systems | grep harbor
+# Verify Zot is running in arc-systems
+kubectl get pods -n arc-systems | grep zot
 
 # Check dind args include --registry-mirror
 kubectl get pod -n arc-runners <runner-pod> -o jsonpath='{.spec.containers[?(@.name=="dind")].args}'
 
-# Check Harbor proxy project exists
-kubectl logs -n arc-systems -l app.kubernetes.io/name=harbor-proxy-setup
+# Check Zot sync logs
+kubectl logs -n arc-systems -l app.kubernetes.io/name=zot --tail=50
 ```
 
 ### Cache server not accessible from runners
@@ -323,7 +324,7 @@ kubectl edit pvc github-actions-cache-server -n arc-systems
 ## Chart Dependencies
 
 - **github-actions-cache-server** (v1.0.0) — local subchart (vendored from https://github.com/falcondev-oss/github-actions-cache-server)
-- **harbor** (v1.18.2) — pull-through proxy cache for Docker Hub + GHCR (AMD64 only)
+- **zot** (v0.1.98) — pull-through cache for Docker Hub (AMD64 only)
 - **gha-runner-scale-set-controller** (v0.9.3) — `ghcr.io/actions/actions-runner-controller-charts`
 - **gha-runner-scale-set** (v0.9.3 × 2) — AMD64 + ARM64 aliases
 
@@ -331,5 +332,5 @@ kubectl edit pvc github-actions-cache-server -n arc-systems
 
 - [GitHub Actions Runner Controller](https://github.com/actions/actions-runner-controller)
 - [GitHub Actions Cache Server](https://github.com/falcondev-oss/github-actions-cache-server)
-- [Harbor Registry](https://goharbor.io/)
+- [Zot Registry](https://zotregistry.dev/)
 - [ARC Security Best Practices](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners-with-actions-runner-controller/deploying-runner-scale-sets-with-actions-runner-controller#security-considerations)
