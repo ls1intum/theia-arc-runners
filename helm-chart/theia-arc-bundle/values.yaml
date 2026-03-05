@@ -220,6 +220,7 @@ zot:
         "distSpecVersion": "1.1.0",
         "storage": {
           "rootDirectory": "/var/lib/registry",
+          "dedupe": true,
           "gc": true,
           "gcDelay": "1h",
           "gcInterval": "6h",
@@ -253,6 +254,7 @@ zot:
               {
                 "urls": ["https://registry-1.docker.io"],
                 "onDemand": true,
+                "pollInterval": "24h",
                 "tlsVerify": true,
                 "preserveDigest": true,
                 "maxRetries": 3,
