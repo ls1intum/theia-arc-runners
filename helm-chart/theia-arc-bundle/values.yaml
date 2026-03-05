@@ -39,10 +39,9 @@ arcRunners:
             - --host=unix:///var/run/docker.sock
             - --group=1001
             # Route docker.io pulls through Zot pull-through cache to avoid Docker Hub rate limits.
-            # Zot is deployed in arc-systems and proxies registry-1.docker.io on-demand.
-            - --registry-mirror=http://theia-arc-systems-zot.arc-systems.svc.cluster.local:5000
-            # Zot is HTTP-only (no TLS), so mark it as an insecure registry.
-            - --insecure-registry=theia-arc-systems-zot.arc-systems.svc.cluster.local:5000
+            # Uses the NodePort URL so the same address works from both theia-prod and parma clusters.
+            - --registry-mirror=http://131.159.88.30:30081
+            - --insecure-registry=131.159.88.30:30081
           securityContext:
             privileged: true
           volumeMounts:
