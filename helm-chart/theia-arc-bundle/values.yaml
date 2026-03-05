@@ -239,7 +239,8 @@ zot:
         },
         "http": {
           "address": "0.0.0.0",
-          "port": "5000"
+          "port": "5000",
+          "Compat": true
         },
         "log": {
           "level": "info"
@@ -253,9 +254,9 @@ zot:
                 "urls": ["https://registry-1.docker.io"],
                 "onDemand": true,
                 "tlsVerify": true,
-                "preserveDigest": false,
+                "preserveDigest": true,
                 "maxRetries": 3,
-                "retryDelay": "5m",
+                "retryDelay": "1m",
                 "content": [
                   {
                     "prefix": "**"
