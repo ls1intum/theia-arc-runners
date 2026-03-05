@@ -35,31 +35,48 @@ Both `dind` and `runner` containers must mount `dind-sock` to `/var/run`.
 
 ### Docker Hub rate limit errors (429 / "toomanyrequests")
 
-Harbor is the pull-through cache for Docker Hub. If runners still hit rate limits:
+Zot is the pull-through cache for Docker Hub. If runners still hit rate limits:
 
 ```bash
-# 1. Confirm Harbor pods are Running
-kubectl get pods -n arc-systems | grep harbor
+# 1. Confirm Zot pod is Running
+kubectl get pods -n arc-systems | grep zot
 
 # 2. Confirm dind is using the registry mirror
 kubectl get pod -n arc-runners <runner-pod> \
   -o jsonpath='{.spec.containers[?(@.name=="dind")].args}'
-# Expected: [..., "--registry-mirror=http://harbor.arc-systems.svc.cluster.local:80", ...]
+# Expected: [..., "--registry-mirror=http://theia-arc-systems-zot.arc-systems.svc.cluster.local:5000", ...]
 
-# 3. Check Harbor proxy project exists
-kubectl logs -n arc-systems -l job-name=harbor-proxy-setup
+# 3. Check Zot logs for sync activity
+kubectl logs -n arc-systems -l app.kubernetes.io/name=zot --tail=50
+# Look for: "sync: on-demand sync for image library/alpine"
 ```
 
-If Harbor pods are down, runners will fall back to direct Docker Hub pulls (and hit rate limits). Fix Harbor first, then recreate runner pods.
+If Zot is down, runners will fall back to direct Docker Hub pulls (and hit rate limits). Fix Zot first, then recreate runner pods.
 
 ### Image pull errors on parma (ARM64)
 
-Parma reaches Harbor on theia-prod via NodePort `131.159.88.30:30080`. If that node is unreachable or Harbor is down on theia-prod, ARM64 runners will hit Docker Hub directly.
+Parma reaches Zot on theia-prod via NodePort `131.159.88.30:30081`. If that node is unreachable or Zot is down on theia-prod, ARM64 runners will hit Docker Hub directly.
 
 ```bash
-# From a parma pod, test Harbor reachability
+# From a parma pod, test Zot reachability
 kubectl run -it --rm debug --image=alpine --restart=Never --context=parma -- \
-  wget -qO- http://131.159.88.30:30080/v2/
+  wget -qO- http://131.159.88.30:30081/v2/
+# Expected: {} (empty JSON — Zot v2 API root)
+```
+
+### Digest mismatch errors (OCI vs Docker v2)
+
+If `docker pull image@sha256:...` fails from the cache, Zot may be returning an OCI manifest where Docker expects Docker v2 schema.
+
+```bash
+# Check Zot logs for conversion errors
+kubectl logs -n arc-systems -l app.kubernetes.io/name=zot --tail=100 | grep -i digest
+```
+
+The Zot config sets `preserveDigest: false` to allow manifest conversion. If errors persist, verify the config is applied:
+
+```bash
+kubectl exec -n arc-systems deploy/theia-arc-systems-zot -- cat /etc/zot/config.json | grep preserveDigest
 ```
 
 ---
@@ -120,18 +137,18 @@ kubectl annotate namespace arc-runners \
 
 Then re-run the `helm install` / `helm upgrade` command.
 
-### `helm upgrade` fails with "port already allocated" (Harbor NodePort conflict)
+### `helm upgrade` fails with "port already allocated" (Zot NodePort conflict)
 
-Part 2 (`theia-arc-runners`) was run without `--set harbor.enabled=false`. Harbor is owned by Part 1 (`theia-arc-systems` in `arc-systems`); when Part 2 also tries to create the Harbor NodePort service in `arc-runners`, Kubernetes rejects it.
+Part 2 (`theia-arc-runners`) was run without `--set zot.enabled=false`. Zot is owned by Part 1 (`theia-arc-systems` in `arc-systems`); when Part 2 also tries to create the Zot NodePort service in `arc-runners`, Kubernetes rejects it.
 
-Always pass `--set harbor.enabled=false` for Part 2 upgrades:
+Always pass `--set zot.enabled=false` for Part 2 upgrades:
 
 ```bash
 helm upgrade theia-arc-runners . \
   --namespace arc-runners \
   --set cacheServer.enabled=false \
   --set arcController.enabled=false \
-  --set harbor.enabled=false \
+  --set zot.enabled=false \
   --set arcRunners.enabled=true \
   --wait --timeout 2m
 ```
@@ -180,7 +197,7 @@ kubectl get pods -n arc-systems
 kubectl get autoscalingrunnersets -n arc-runners
 kubectl get pods -n arc-runners
 
-# PVCs (cache server + Harbor)
+# PVCs (cache server + Zot)
 kubectl get pvc -n arc-systems
 
 # Controller logs
@@ -191,4 +208,10 @@ kubectl logs -n arc-runners <runner-pod> -c runner --follow
 
 # DinD logs (for Docker daemon errors)
 kubectl logs -n arc-runners <runner-pod> -c dind
+
+# Zot cache activity
+kubectl logs -n arc-systems -l app.kubernetes.io/name=zot --tail=100
+
+# Zot PVC usage
+kubectl exec -n arc-systems -l app.kubernetes.io/name=zot -- df -h /var/lib/registry
 ```

@@ -1,8 +1,8 @@
-# Architecture: Stateless CI with Harbor Registry Cache
+# Architecture: Stateless CI with Zot Registry Cache
 
 ## Overview
 
-Ephemeral GitHub Actions runners backed by a Harbor pull-through proxy cache and a GitHub Actions Cache Server. Runners are stateless (no PVCs) and scale 10–50 based on job demand.
+Ephemeral GitHub Actions runners backed by a Zot pull-through cache and a GitHub Actions Cache Server. Runners are stateless (no PVCs) and scale 10–50 based on job demand.
 
 ## Clusters
 
@@ -13,26 +13,21 @@ Ephemeral GitHub Actions runners backed by a Harbor pull-through proxy cache and
 
 ## Components
 
-### 1. Harbor Registry Cache (AMD64 only)
+### 1. Zot Registry Cache (AMD64 only)
 
-Harbor is deployed in `arc-systems` on theia-prod. It exposes two proxy cache projects:
+Zot is deployed in `arc-systems` on theia-prod. It is a CNCF Sandbox OCI registry that supports the `--registry-mirror` transparent proxy protocol natively.
 
-| Project | Upstream | In-cluster pull URL |
-|---------|----------|---------------------|
-| `dockerhub-proxy` | `registry-1.docker.io` | `harbor.arc-systems.svc.cluster.local:80/dockerhub-proxy/` |
-| `ghcr-proxy` | `ghcr.io` | `harbor.arc-systems.svc.cluster.local:80/ghcr-proxy/` |
+On a cache miss, Zot fetches from `registry-1.docker.io`, caches the blob, and serves it. On subsequent pulls the blob is served from the PVC without contacting Docker Hub.
 
-These projects are created automatically by the `harbor-proxy-setup` Helm post-install hook Job on every install/upgrade.
-
-Harbor is HTTP-only (no TLS). DinD containers are configured with:
+Zot is HTTP-only. DinD containers are configured with:
 ```
---registry-mirror=http://<harbor-addr>
---insecure-registry=<harbor-addr>
+--registry-mirror=http://<zot-addr>
+--insecure-registry=<zot-addr>
 ```
 
-This makes all `docker pull` calls route through Harbor transparently — workflows do not need any changes.
+This makes all `docker pull` calls route through Zot transparently — workflows do not need any changes.
 
-**parma (ARM64)** has no local Harbor. It reaches theia-prod's Harbor via a Kubernetes NodePort at `131.159.88.30:30080`.
+**parma (ARM64)** has no local Zot. It reaches theia-prod's Zot via a Kubernetes NodePort at `131.159.88.30:30081`.
 
 ### 2. GitHub Actions Cache Server
 
@@ -48,7 +43,7 @@ Backed by a 200Gi PVC. Cache entries older than 90 days are pruned automatically
 **Mode:** Kubernetes mode with manual DinD sidecar
 
 **Namespace split** (GitHub security best practice):
-- `arc-systems`: ARC controller, listeners, Cache Server, Harbor
+- `arc-systems`: ARC controller, listeners, Cache Server, Zot
 - `arc-runners`: AutoscalingRunnerSet, ephemeral runner pods
 
 **Runner pod structure:**
@@ -64,7 +59,7 @@ Backed by a 200Gi PVC. Cache entries older than 90 days are pruned automatically
 │ - docker daemon      │ - actions runner binary   │
 │ - privileged         │ - DOCKER_HOST=unix://sock │
 │ - --registry-mirror  │ - runs workflow steps     │
-│   → Harbor           │                           │
+│   → Zot              │                           │
 └──────────────────────┴──────────────────────────┘
          shared volumes:
            dind-sock   → /var/run        (docker socket)
@@ -87,11 +82,11 @@ Runner Pod (arc-runners)
   │  docker pull alpine
   ▼
 dind container
-  │  --registry-mirror → Harbor
+  │  --registry-mirror → Zot
   ▼
-Harbor (arc-systems)
-  ├── cache HIT  → return cached layer immediately
-  └── cache MISS → fetch from registry-1.docker.io, cache, return
+Zot (arc-systems)
+  ├── cache HIT  → serve from PVC immediately
+  └── cache MISS → fetch from registry-1.docker.io, cache, serve
 ```
 
 ## Helm Deployment Model
@@ -100,22 +95,21 @@ The chart is deployed in **two separate Helm releases** because Helm 3 cannot de
 
 | Release | Namespace | Contains |
 |---------|-----------|----------|
-| `theia-arc-systems` | `arc-systems` | ARC controller, Cache Server, Harbor |
+| `theia-arc-systems` | `arc-systems` | ARC controller, Cache Server, Zot |
 | `theia-arc-runners` | `arc-runners` | AutoscalingRunnerSet only |
 
 > **The Part 1 release name must be `theia-arc-systems`** — the controller ServiceAccount is named `theia-arc-systems-gha-rs-controller` and Part 2 references it by that exact name.
 
-> **Part 2 must always pass `--set harbor.enabled=false`** — Harbor is owned by the `theia-arc-systems` release in `arc-systems`. If omitted, Helm tries to create the Harbor NodePort in `arc-runners` and fails with "port already allocated".
+> **Part 2 must always pass `--set zot.enabled=false`** — Zot is owned by the `theia-arc-systems` release in `arc-systems`. If omitted, Helm tries to create the Zot NodePort service in `arc-runners` and fails with "port already allocated".
 
 ## Storage
 
 | Resource | Namespace | Size | Storage Class |
 |----------|-----------|------|---------------|
 | `github-actions-cache-server` PVC | `arc-systems` | 200Gi | `csi-rbd-sc` (AMD64) / `longhorn` (ARM64) |
-| Harbor core PVC | `arc-systems` | 10Gi | `csi-rbd-sc` |
-| Harbor registry PVC | `arc-systems` | 200Gi | `csi-rbd-sc` |
+| Zot PVC | `arc-systems` | 100Gi | `csi-rbd-sc` |
 
-Harbor is AMD64 only — parma has no local Harbor PVCs.
+Zot is AMD64 only — parma has no local Zot PVC.
 
 ## Verification
 
@@ -132,6 +126,6 @@ kubectl get pods -n arc-runners
 # PVCs
 kubectl get pvc -n arc-systems
 
-# Harbor proxy projects
-kubectl logs -n arc-systems -l job-name=harbor-proxy-setup
+# Zot sync activity
+kubectl logs -n arc-systems -l app.kubernetes.io/name=zot --tail=50
 ```
