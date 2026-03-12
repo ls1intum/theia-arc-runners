@@ -24,40 +24,33 @@ spec:
         kubernetes.io/arch: amd64
       containers:
         - name: buildkitd
-          image: moby/buildkit:latest-rootless
+          # Privileged variant — theia-prod runs kernel 5.4 (Ubuntu 20.04) which is below
+          # the 5.11 minimum required for rootless --oci-worker-no-process-sandbox.
+          # Privileged mode is already used by DinD in runner pods on this cluster.
+          image: moby/buildkit:latest
           args:
             - --addr
             - tcp://0.0.0.0:1234
-            # Required for rootless mode without a nested user namespace (kernel >= 5.11).
-            # Avoids the need for privileged containers while still using the OCI snapshotter.
-            - --oci-worker-no-process-sandbox
           ports:
             - containerPort: 1234
               name: buildkitd
               protocol: TCP
           readinessProbe:
             exec:
-              command: ["buildctl", "debug", "workers"]
+              command: ["buildctl", "--addr", "tcp://localhost:1234", "debug", "workers"]
             initialDelaySeconds: 5
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 3
           livenessProbe:
             exec:
-              command: ["buildctl", "debug", "workers"]
+              command: ["buildctl", "--addr", "tcp://localhost:1234", "debug", "workers"]
             initialDelaySeconds: 5
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 3
           securityContext:
-            # Required for rootless BuildKit — seccomp and AppArmor must be unconfined so
-            # that the user-namespace-based snapshotter can function without extra privileges.
-            seccompProfile:
-              type: Unconfined
-            appArmorProfile:
-              type: Unconfined
-            runAsUser: 1000
-            runAsGroup: 1000
+            privileged: true
           resources:
             requests:
               cpu: 500m
@@ -67,8 +60,7 @@ spec:
               memory: 16Gi
           volumeMounts:
             - name: buildkit-cache
-              # Rootless BuildKit stores its content-addressed snapshot store here.
-              mountPath: /home/user/.local/share/buildkit
+              mountPath: /var/lib/buildkit
   volumeClaimTemplates:
     - metadata:
         name: buildkit-cache
