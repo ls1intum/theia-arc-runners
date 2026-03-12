@@ -1,0 +1,74 @@
+name: "BuildKit Setup"
+description: >
+  Routes the current job to a stateful BuildKit worker (deterministic consistent hashing on
+  GITHUB_REPOSITORY + dockerfile_path) and configures Docker Buildx with the remote driver
+  pointing at that worker.
+
+  Prerequisites:
+    - Must run on the experimental runner set (runs-on: arc-runner-set-buildkit-exp).
+    - The runner pod already has BUILDKIT_NAMESPACE and BUILDKIT_NUM_WORKERS in its environment
+      (injected by the ARC runner template in values.yaml). These inputs default to those env vars.
+
+inputs:
+  dockerfile:
+    description: >
+      Path to the Dockerfile, relative to the repository root.
+      Included in the hash key so different language variants in the same repo
+      always land on different workers, giving each variant its own warm cache.
+      Example: "docker/Dockerfile.java" or "Dockerfile"
+    required: false
+    default: "Dockerfile"
+  num-workers:
+    description: "Number of BuildKit workers. Defaults to the BUILDKIT_NUM_WORKERS env var set by the runner template (5)."
+    required: false
+    default: "${{ env.BUILDKIT_NUM_WORKERS }}"
+  namespace:
+    description: "Kubernetes namespace where BuildKit workers live. Defaults to the BUILDKIT_NAMESPACE env var set by the runner template."
+    required: false
+    default: "${{ env.BUILDKIT_NAMESPACE }}"
+
+outputs:
+  worker-id:
+    description: "Zero-based index of the selected BuildKit worker (0 … num-workers−1)."
+    value: ${{ steps.route.outputs.worker_id }}
+  endpoint:
+    description: "Full TCP address of the selected BuildKit worker, e.g. tcp://buildkitd-2.buildkitd.buildkit-exp.svc.cluster.local:1234"
+    value: ${{ steps.route.outputs.addr }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Compute BuildKit worker
+      id: route
+      shell: bash
+      env:
+        HASH_INPUT: "${{ github.repository }}::${{ inputs.dockerfile }}"
+        NUM_WORKERS: "${{ inputs.num-workers }}"
+        BK_NAMESPACE: "${{ inputs.namespace }}"
+      run: |
+        set -euo pipefail
+
+        if [[ -z "${NUM_WORKERS:-}" || "${NUM_WORKERS}" == "0" ]]; then
+          echo "::error::num-workers is not set. Is this job running on arc-runner-set-buildkit-exp?"
+          exit 1
+        fi
+        if [[ -z "${BK_NAMESPACE:-}" ]]; then
+          echo "::error::namespace is not set. Is this job running on arc-runner-set-buildkit-exp?"
+          exit 1
+        fi
+
+        # Deterministic hash: GITHUB_REPOSITORY + "::" + dockerfile_path
+        # cksum outputs a CRC32 value which is stable across runs for the same input.
+        WORKER_ID=$(echo -n "${HASH_INPUT}" | cksum | awk "{print \$1 % ${NUM_WORKERS}}")
+        ADDR="tcp://buildkitd-${WORKER_ID}.buildkitd.${BK_NAMESPACE}.svc.cluster.local:1234"
+
+        echo "worker_id=${WORKER_ID}" >> "${GITHUB_OUTPUT}"
+        echo "addr=${ADDR}"           >> "${GITHUB_OUTPUT}"
+
+        echo "BuildKit routing: '${HASH_INPUT}' → buildkitd-${WORKER_ID} @ ${ADDR}"
+
+    - name: Set up Docker Buildx (remote driver)
+      uses: docker/setup-buildx-action@v3
+      with:
+        driver: remote
+        endpoint: ${{ steps.route.outputs.addr }}
