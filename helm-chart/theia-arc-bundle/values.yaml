@@ -170,8 +170,8 @@ arcRunnersArm:
 # Set enabled: true when buildkit-exp namespace is deployed on theia-prod.
 arcRunnersExp:
   enabled: false
-  githubConfigUrl: "https://github.com/ls1intum"
-  githubConfigSecret: "github-arc-secret"
+  githubConfigUrl: "https://github.com/EduIDE"
+  githubConfigSecret: "github-arc-secret-eduidec"
   minRunners: 0
   maxRunners: 10
   runnerScaleSetName: "arc-runner-set-buildkit-exp"
