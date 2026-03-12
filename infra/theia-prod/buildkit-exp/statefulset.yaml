@@ -31,6 +31,8 @@ spec:
           args:
             - --addr
             - tcp://0.0.0.0:1234
+            - --allow-insecure-entitlement
+            - network.host
           ports:
             - containerPort: 1234
               name: buildkitd
