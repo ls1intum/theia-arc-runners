@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: buildkitd-config
+  namespace: buildkit-exp
+  labels:
+    app: buildkitd
+    app.kubernetes.io/name: buildkitd
+    app.kubernetes.io/part-of: theia-arc-runners
+data:
+  buildkitd.toml: |
+    [registry."docker.io"]
+      mirrors = ["http://theia-arc-systems-zot.arc-systems.svc.cluster.local:5000"]
+    [registry."theia-arc-systems-zot.arc-systems.svc.cluster.local:5000"]
+      http = true

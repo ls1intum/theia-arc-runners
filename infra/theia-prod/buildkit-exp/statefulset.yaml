@@ -33,6 +33,8 @@ spec:
             - tcp://0.0.0.0:1234
             - --allow-insecure-entitlement
             - network.host
+            - --config
+            - /etc/buildkit/buildkitd.toml
           ports:
             - containerPort: 1234
               name: buildkitd
@@ -63,6 +65,13 @@ spec:
           volumeMounts:
             - name: buildkit-cache
               mountPath: /var/lib/buildkit
+            - name: config
+              mountPath: /etc/buildkit
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: buildkitd-config
   volumeClaimTemplates:
     - metadata:
         name: buildkit-cache
