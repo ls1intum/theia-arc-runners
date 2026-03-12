@@ -172,8 +172,8 @@ arcRunnersExp:
   enabled: false
   githubConfigUrl: "https://github.com/EduIDE"
   githubConfigSecret: "github-arc-secret-eduidec"
-  minRunners: 0
-  maxRunners: 10
+  minRunners: 10
+  maxRunners: 50
   runnerScaleSetName: "arc-runner-set-buildkit-exp"
   controllerServiceAccount:
     namespace: arc-systems
