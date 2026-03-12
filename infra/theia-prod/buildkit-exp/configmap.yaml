@@ -9,7 +9,31 @@ metadata:
     app.kubernetes.io/part-of: theia-arc-runners
 data:
   buildkitd.toml: |
+    # --- Registry mirrors (docker.io → Zot pull-through cache) ---
     [registry."docker.io"]
       mirrors = ["http://theia-arc-systems-zot.arc-systems.svc.cluster.local:5000"]
     [registry."theia-arc-systems-zot.arc-systems.svc.cluster.local:5000"]
       http = true
+
+    # --- Garbage collection ---
+    # Override defaults to remove the 48h/512MB cap on cache mounts.
+    # Each worker has a 100Gi PVC at /var/lib/buildkit.
+    [worker.oci]
+      # Cache mounts (apt, yarn, pip) and source checkouts — keep 30 days.
+      [[worker.oci.gcpolicy]]
+        filters = ["type==source.local", "type==exec.cachemount", "type==source.git.checkout"]
+        keepDuration = "720h"
+        reservedSpace = "50GB"
+        maxUsedSpace = "95GB"
+
+      # Build layers and other records — keep 60 days.
+      [[worker.oci.gcpolicy]]
+        keepDuration = "1440h"
+        reservedSpace = "10GB"
+        maxUsedSpace = "95GB"
+
+      # Fallback — evict everything if disk is nearly full.
+      [[worker.oci.gcpolicy]]
+        all = true
+        maxUsedSpace = "95GB"
+        minFreeSpace = "5GB"
