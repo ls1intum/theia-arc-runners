@@ -33,3 +33,6 @@ zot:
 
 arcRunnersExp:
   enabled: false
+
+arcRunnersArmBuildkit:
+  enabled: true

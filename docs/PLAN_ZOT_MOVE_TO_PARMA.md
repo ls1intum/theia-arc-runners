@@ -1,7 +1,27 @@
 # Plan: Migrate Zot from theia-prod to parma
 
 **Date:** 2026-03-12
-**Status:** Draft — awaiting approval before implementation
+**Status:** Deprecated / On hold (2026-03-17)
+
+> ## Decision (2026-03-17)
+>
+> This migration is intentionally **not** being executed at this time.
+>
+> Current operating model remains:
+> - Zot runs on `theia-prod` in `arc-systems`
+> - parma runners use Zot via `131.159.88.30:30081`
+>
+> Rationale:
+> - current setup is stable and already in production
+> - expected performance gain does not currently justify migration complexity/risk
+> - migration introduces additional operational overhead (storage migration, node-pinned PV management, rollback choreography)
+>
+> Revisit only if one or more trigger conditions occur:
+> 1. measured image pull latency/cache-miss penalties become a significant CI bottleneck,
+> 2. capacity pressure on current Zot storage,
+> 3. reliability incidents attributable to cross-cluster Zot access.
+
+> Until then, keep this file as historical context only.
 
 ---
 

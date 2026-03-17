@@ -41,6 +41,13 @@ dependencies:
     alias: arcRunnersExp
     condition: arcRunnersExp.enabled
 
+  # ARM64 BuildKit ARC Runner Scale Set — routes docker builds to stateful BuildKit workers on parma.
+  - name: gha-runner-scale-set
+    version: 0.9.3
+    repository: "oci://ghcr.io/actions/actions-runner-controller-charts"
+    alias: arcRunnersArmBuildkit
+    condition: arcRunnersArmBuildkit.enabled
+
   # GitHub Actions Cache Server (local subchart from https://github.com/falcondev-oss/github-actions-cache-server)
   - name: github-actions-cache-server
     version: 1.0.0

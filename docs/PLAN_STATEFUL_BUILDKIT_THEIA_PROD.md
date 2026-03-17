@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-12
 **Branch:** `feat/stateful-buildkit-runners`
-**Status:** Draft — awaiting approval before implementation
+**Status:** Completed (2026-03-17)
 **Scope:** theia-prod only. parma gets the same treatment in a follow-up.
 
 > **Deployment strategy:** BuildKit workers are deployed to an isolated `buildkit-exp` namespace.

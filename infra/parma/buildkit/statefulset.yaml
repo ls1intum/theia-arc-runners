@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: buildkitd
+  namespace: buildkit
+  labels:
+    app: buildkitd
+    app.kubernetes.io/name: buildkitd
+    app.kubernetes.io/part-of: theia-arc-runners
+spec:
+  serviceName: buildkitd
+  podManagementPolicy: Parallel
+  replicas: 5
+  selector:
+    matchLabels:
+      app: buildkitd
+  template:
+    metadata:
+      labels:
+        app: buildkitd
+        app.kubernetes.io/name: buildkitd
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: arm64
+      containers:
+        - name: buildkitd
+          # Keep privileged mode for compatibility with existing ARC DinD assumptions.
+          image: moby/buildkit:latest
+          args:
+            - --addr
+            - tcp://0.0.0.0:1234
+            - --allow-insecure-entitlement
+            - network.host
+            - --config
+            - /etc/buildkit/buildkitd.toml
+          ports:
+            - containerPort: 1234
+              name: buildkitd
+              protocol: TCP
+          readinessProbe:
+            exec:
+              command: ["buildctl", "--addr", "tcp://localhost:1234", "debug", "workers"]
+            initialDelaySeconds: 5
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["buildctl", "--addr", "tcp://localhost:1234", "debug", "workers"]
+            initialDelaySeconds: 5
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 8000m
+              memory: 16Gi
+          volumeMounts:
+            - name: buildkit-cache
+              mountPath: /var/lib/buildkit
+            - name: config
+              mountPath: /etc/buildkit
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: buildkitd-config
+  volumeClaimTemplates:
+    - metadata:
+        name: buildkit-cache
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: longhorn
+        resources:
+          requests:
+            storage: 100Gi

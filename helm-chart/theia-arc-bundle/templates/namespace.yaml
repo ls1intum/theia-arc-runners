@@ -6,7 +6,7 @@ metadata:
   labels:
     {{- include "theia-arc-bundle.labels" . | nindent 4 }}
 {{- end }}
-{{- if and (or .Values.arcRunners.enabled .Values.arcRunnersArm.enabled) .Values.createNamespaces }}
+{{- if and (or .Values.arcRunners.enabled .Values.arcRunnersArm.enabled .Values.arcRunnersExp.enabled .Values.arcRunnersArmBuildkit.enabled) .Values.createNamespaces }}
 ---
 apiVersion: v1
 kind: Namespace

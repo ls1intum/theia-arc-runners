@@ -1,4 +1,4 @@
-{{- if or .Values.arcRunners.enabled .Values.arcRunnersArm.enabled }}
+{{- if or .Values.arcRunners.enabled .Values.arcRunnersArm.enabled .Values.arcRunnersExp.enabled .Values.arcRunnersArmBuildkit.enabled }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:

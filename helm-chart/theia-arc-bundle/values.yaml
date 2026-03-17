@@ -247,6 +247,88 @@ arcRunnersExp:
         - name: dind-externals
           emptyDir: {}
 
+# ARM64 BuildKit runner set for parma.
+# Routes docker builds to stateful BuildKit workers in the buildkit namespace.
+# Workflows opt in explicitly with: runs-on: arc-runner-set-arm64-buildkit
+arcRunnersArmBuildkit:
+  enabled: false
+  githubConfigUrl: "https://github.com/EduIDE"
+  githubConfigSecret: "github-arc-secret-eduidec"
+  minRunners: 10
+  maxRunners: 50
+  runnerScaleSetName: "arc-runner-set-arm64-buildkit"
+  controllerServiceAccount:
+    namespace: arc-systems
+    name: theia-arc-systems-gha-rs-controller
+  buildkit:
+    namespace: buildkit
+    numWorkers: 5
+  template:
+    spec:
+      serviceAccountName: arc-runner-set-stateless-arm-sa
+      initContainers:
+        - name: init-dind-externals
+          image: ghcr.io/falcondev-oss/actions-runner:latest
+          command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
+          volumeMounts:
+            - name: dind-externals
+              mountPath: /home/runner/tmpDir
+      containers:
+        - name: dind
+          image: docker:dind
+          args:
+            - dockerd
+            - --host=unix:///var/run/docker.sock
+            - --group=1001
+            - --registry-mirror=http://131.159.88.30:30081
+            - --insecure-registry=131.159.88.30:30081
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: work
+              mountPath: /home/runner/_work
+            - name: dind-sock
+              mountPath: /var/run
+            - name: dind-externals
+              mountPath: /home/runner/externals
+        - name: runner
+          image: ghcr.io/falcondev-oss/actions-runner:latest
+          command: ["/home/runner/run.sh"]
+          env:
+            - name: DOCKER_HOST
+              value: unix:///var/run/docker.sock
+            - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
+              value: "false"
+            - name: ACTIONS_RESULTS_URL
+              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
+            - name: CUSTOM_ACTIONS_RESULTS_URL
+              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
+            - name: BUILDKIT_NAMESPACE
+              value: buildkit
+            - name: BUILDKIT_NUM_WORKERS
+              value: "5"
+          volumeMounts:
+            - name: work
+              mountPath: /home/runner/_work
+            - name: dind-sock
+              mountPath: /var/run
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 4000m
+              memory: 8Gi
+      volumes:
+        - name: work
+          emptyDir:
+            medium: Memory
+            sizeLimit: 30Gi
+        - name: dind-sock
+          emptyDir: {}
+        - name: dind-externals
+          emptyDir: {}
+
 cache-server:
   enabled: true
   replicaCount: 1

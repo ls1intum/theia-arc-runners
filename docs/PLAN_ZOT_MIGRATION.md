@@ -1,7 +1,7 @@
 # Plan: Replace Harbor with Zot Registry Pull-Through Cache
 
 **Date:** 2026-03-02
-**Status:** Draft — awaiting approval before implementation
+**Status:** Completed (2026-03-17)
 
 ---
 
