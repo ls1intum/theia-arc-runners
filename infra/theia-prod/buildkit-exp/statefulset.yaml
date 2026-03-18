@@ -90,6 +90,5 @@ spec:
         storageClassName: csi-rbd-sc
         resources:
           requests:
-            # 100 Gi per worker. BuildKit's built-in GC triggers at 75% and trims to 60%,
-            # so workers self-manage. Can be resized online via Ceph RBD if needed.
-            storage: 100Gi
+            # 500 Gi per worker.
+            storage: 500Gi

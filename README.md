@@ -14,7 +14,7 @@ BuildKit-focused runner sets backed by stateful BuildKit workers, a shared Zot p
 ## Features
 
 - ARC runner sets for EduIDE organization workloads
-- Stateful BuildKit workers (7 replicas per cluster, 100Gi per worker)
+- Stateful BuildKit workers (7 replicas per cluster, 500Gi per worker)
 - Zot pull-through cache for `docker.io` (removes Docker Hub rate-limit pressure)
 - GitHub Actions Cache Server for `actions/cache` compatibility (200Gi PVC)
 - Memory-backed work volume on parma runners (`emptyDir.medium: Memory`, 30Gi)

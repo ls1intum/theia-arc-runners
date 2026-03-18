@@ -20,7 +20,7 @@ Key choices:
 - Namespace: `buildkit` (without `-exp` suffix)
 - Architecture: `arm64` node selector on BuildKit StatefulSet
 - StorageClass: `longhorn`
-- Persistent cache: 7 PVCs (`100Gi` each) via `volumeClaimTemplates`
+- Persistent cache: 7 PVCs (`500Gi` each) via `volumeClaimTemplates`
 - BuildKit endpoint DNS pattern:
   - `tcp://buildkitd-<N>.buildkitd.buildkit.svc.cluster.local:1234`
 - Docker mirror in `buildkitd.toml`: Zot NodePort `http://131.159.88.117:30081`

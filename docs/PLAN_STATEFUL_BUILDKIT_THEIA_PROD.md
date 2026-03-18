@@ -9,7 +9,7 @@
 - StatefulSet `buildkitd` runs with:
   - `replicas: 7`
   - storage class `csi-rbd-sc`
-  - PVC size `100Gi` per worker
+  - PVC size `500Gi` per worker
   - preferred pod anti-affinity across hosts
 - ARC build runner set used for this path:
   - `arc-buildkit-eduide-amd64`
