@@ -11,7 +11,7 @@
   - release: `theia-zot`
   - namespace: `zot-system`
   - location: parma cluster
-  - storage: Longhorn PVC (`100Gi`)
+  - storage: Longhorn PVC (`250Gi`)
   - service: NodePort `30081`
 - Both runner clusters use the same mirror endpoint:
   - `http://131.159.88.117:30081`

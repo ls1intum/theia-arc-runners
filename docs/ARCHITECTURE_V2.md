@@ -109,7 +109,7 @@ The chart is deployed in **two separate Helm releases** because Helm 3 cannot de
 | Resource | Namespace | Size | Storage Class |
 |----------|-----------|------|---------------|
 | `github-actions-cache-server` PVC | `arc-systems` | 200Gi | `csi-rbd-sc` (AMD64) / `longhorn` (ARM64) |
-| Zot PVC | `zot-system` | 100Gi | `longhorn` |
+| Zot PVC | `zot-system` | 250Gi | `longhorn` |
 
 ## Verification
 

@@ -27,7 +27,7 @@ Zot is deployed as a standalone release on parma:
 
 - release: `theia-zot`
 - namespace: `zot-system`
-- storage: Longhorn PVC (100Gi)
+- storage: Longhorn PVC (250Gi)
 - service: NodePort `30081`
 
 Runner DinD containers are configured with:
