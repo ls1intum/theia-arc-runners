@@ -1,21 +1,21 @@
-# Architecture: Stateless CI with Zot Registry Cache
+# Architecture: BuildKit-backed CI with Zot Registry Cache
 
 ## Overview
 
-Ephemeral GitHub Actions runners backed by a Zot pull-through cache and a GitHub Actions Cache Server. Runners are stateless (no PVCs) and scale 10–50 based on job demand.
+Ephemeral GitHub Actions runners backed by stateful BuildKit workers, a Zot pull-through cache, and a GitHub Actions Cache Server. Runner pods are stateless; BuildKit cache persists on dedicated worker PVCs.
 
 ## Clusters
 
 | Cluster | Context | Architecture | Runner Scale Set |
 |---------|---------|--------------|-----------------|
-| theia-prod | `theia-prod` | AMD64 | `arc-runner-set-stateless` |
-| parma | `parma` | ARM64 | `arc-runner-set-arm64` |
+| theia-prod | `theia-prod` | AMD64 | `arc-buildkit-eduide-amd64` |
+| parma | `parma` | ARM64 | `arc-buildkit-eduide-arm64` |
 
 ## Components
 
-### 1. Zot Registry Cache (AMD64 only)
+### 1. Zot Registry Cache (shared)
 
-Zot is deployed in `arc-systems` on theia-prod. It is a CNCF Sandbox OCI registry that supports the `--registry-mirror` transparent proxy protocol natively.
+Zot is deployed on parma as a standalone Helm release (`theia-zot`) in namespace `zot-system`. It is a CNCF Sandbox OCI registry that supports the `--registry-mirror` transparent proxy protocol natively.
 
 On a cache miss, Zot fetches from `registry-1.docker.io`, caches the blob, and serves it. On subsequent pulls the blob is served from the PVC without contacting Docker Hub.
 
@@ -27,7 +27,7 @@ Zot is HTTP-only. DinD containers are configured with:
 
 This makes all `docker pull` calls route through Zot transparently — workflows do not need any changes.
 
-**parma (ARM64)** has no local Zot. It reaches theia-prod's Zot via a Kubernetes NodePort at `131.159.88.30:30081`.
+Both clusters reach Zot via NodePort `131.159.88.117:30081`.
 
 ### 2. GitHub Actions Cache Server
 
@@ -43,8 +43,9 @@ Backed by a 200Gi PVC. Cache entries older than 90 days are pruned automatically
 **Mode:** Kubernetes mode with manual DinD sidecar
 
 **Namespace split** (GitHub security best practice):
-- `arc-systems`: ARC controller, listeners, Cache Server, Zot
+- `arc-systems`: ARC controller, listeners, Cache Server
 - `arc-runners`: AutoscalingRunnerSet, ephemeral runner pods
+- `zot-system`: Zot registry
 
 **Runner pod structure:**
 
@@ -84,7 +85,7 @@ Runner Pod (arc-runners)
 dind container
   │  --registry-mirror → Zot
   ▼
-Zot (arc-systems)
+Zot (zot-system)
   ├── cache HIT  → serve from PVC immediately
   └── cache MISS → fetch from registry-1.docker.io, cache, serve
 ```
@@ -95,21 +96,20 @@ The chart is deployed in **two separate Helm releases** because Helm 3 cannot de
 
 | Release | Namespace | Contains |
 |---------|-----------|----------|
-| `theia-arc-systems` | `arc-systems` | ARC controller, Cache Server, Zot |
+| `theia-arc-systems` | `arc-systems` | ARC controller, Cache Server |
 | `theia-arc-runners` | `arc-runners` | AutoscalingRunnerSet only |
+| `theia-zot` | `zot-system` | Zot registry |
 
 > **The Part 1 release name must be `theia-arc-systems`** — the controller ServiceAccount is named `theia-arc-systems-gha-rs-controller` and Part 2 references it by that exact name.
 
-> **Part 2 must always pass `--set zot.enabled=false`** — Zot is owned by the `theia-arc-systems` release in `arc-systems`. If omitted, Helm tries to create the Zot NodePort service in `arc-runners` and fails with "port already allocated".
+> Zot is managed separately by the `theia-zot` release in `zot-system`.
 
 ## Storage
 
 | Resource | Namespace | Size | Storage Class |
 |----------|-----------|------|---------------|
 | `github-actions-cache-server` PVC | `arc-systems` | 200Gi | `csi-rbd-sc` (AMD64) / `longhorn` (ARM64) |
-| Zot PVC | `arc-systems` | 100Gi | `csi-rbd-sc` |
-
-Zot is AMD64 only — parma has no local Zot PVC.
+| Zot PVC | `zot-system` | 100Gi | `longhorn` |
 
 ## Verification
 
@@ -127,5 +127,5 @@ kubectl get pods -n arc-runners
 kubectl get pvc -n arc-systems
 
 # Zot sync activity
-kubectl logs -n arc-systems -l app.kubernetes.io/name=zot --tail=50
+kubectl logs -n zot-system -l app.kubernetes.io/name=zot --tail=50
 ```

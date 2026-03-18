@@ -20,10 +20,10 @@ Key choices:
 - Namespace: `buildkit` (without `-exp` suffix)
 - Architecture: `arm64` node selector on BuildKit StatefulSet
 - StorageClass: `longhorn`
-- Persistent cache: 5 PVCs (`100Gi` each) via `volumeClaimTemplates`
+- Persistent cache: 7 PVCs (`100Gi` each) via `volumeClaimTemplates`
 - BuildKit endpoint DNS pattern:
   - `tcp://buildkitd-<N>.buildkitd.buildkit.svc.cluster.local:1234`
-- Docker mirror in `buildkitd.toml`: Zot NodePort `http://131.159.88.30:30081`
+- Docker mirror in `buildkitd.toml`: Zot NodePort `http://131.159.88.117:30081`
 
 ### 2) Helm chart wiring for new ARM BuildKit ARC runner set
 
@@ -33,10 +33,10 @@ Updated:
   - Added dependency alias: `arcRunnersArmBuildkit`
 - `helm-chart/theia-arc-bundle/values.yaml`
   - Added full `arcRunnersArmBuildkit` block
-  - Runner scale set name: `arc-runner-set-arm64-buildkit`
+  - Runner scale set name: `arc-buildkit-eduide-arm64`
   - Added env vars for workflow routing:
     - `BUILDKIT_NAMESPACE=buildkit`
-    - `BUILDKIT_NUM_WORKERS=5`
+    - `BUILDKIT_NUM_WORKERS=7`
 - `helm-chart/theia-arc-bundle/values-arm64.yaml`
   - Enabled: `arcRunnersArmBuildkit.enabled: true`
 - `helm-chart/theia-arc-bundle/templates/rbac.yaml`
@@ -70,10 +70,9 @@ helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   --namespace arc-runners --kube-context parma \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-arm64.yaml \
-  --set cacheServer.enabled=false \
+  --set cache-server.enabled=false \
   --set arcController.enabled=false \
-  --set zot.enabled=false \
-  --set arcRunnersArm.enabled=true \
+  --set arcRunnersArm.enabled=false \
   --set arcRunnersArmBuildkit.enabled=true \
   --wait --timeout 10m
 ```
@@ -84,11 +83,11 @@ Note: First attempt timed out at default 2m timeout; second attempt with 10m suc
 
 Verified healthy state:
 
-- BuildKit StatefulSet pods: `buildkitd-0..4` all `Running`
-- BuildKit PVCs: all 5 `Bound` on `longhorn`
+- BuildKit StatefulSet pods: `buildkitd-0..6` all `Running`
+- BuildKit PVCs: all 7 `Bound` on `longhorn`
 - Headless service `buildkitd` present in namespace `buildkit`
 - AutoscalingRunnerSet present:
-  - `arc-runner-set-arm64-buildkit`
+  - `arc-buildkit-eduide-arm64`
 - Runner pods for that set: all `2/2 Running`
 - Secret used by set exists:
   - `github-arc-secret-eduidec` in `arc-runners`
@@ -97,5 +96,5 @@ Verified healthy state:
 
 - This rollout is **manual selection only**; no automatic fallback behavior was introduced.
 - Workflow jobs should target the new label explicitly:
-  - `runs-on: arc-runner-set-arm64-buildkit`
+  - `runs-on: arc-buildkit-eduide-arm64`
 - BuildKit routing variables are injected via runner env and expected by workflow logic.

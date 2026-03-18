@@ -4,21 +4,19 @@ Guidance for AI coding agents working in this repository.
 
 ## Repository Overview
 
-**Pure infrastructure-as-code** repository. No application code, no build pipeline, no tests.
+**Pure infrastructure-as-code** repository. No application code and no application-level test suite.
 The stack is: Helm 3 umbrella chart + Kubernetes YAML + GitHub Actions workflows.
 
 **Two target clusters:**
 
-| Cluster | Context | Arch | ARC runner set name |
-|---------|---------|------|---------------------|
-| theia-prod | `theia-prod` | AMD64 | `arc-runner-set-stateless` |
-| parma | `parma` | ARM64 | `arc-runner-set-arm64` |
+| Cluster | Context | Arch | Active BuildKit runner set |
+|---------|---------|------|-----------------------------|
+| theia-prod | `theia-prod` | AMD64 | `arc-buildkit-eduide-amd64` |
+| parma | `parma` | ARM64 | `arc-buildkit-eduide-arm64` |
 
 ---
 
 ## Deployment Commands
-
-There are **no build, lint, or test commands**. Deployment is done via Helm and kubectl.
 
 ### Helm — Deploy Part 1 (Controller + Cache Server)
 
@@ -30,37 +28,58 @@ helm upgrade --install theia-arc-systems . \
   --namespace arc-systems --create-namespace \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
+  --set arcRunnersExp.enabled=false \
+  --set arcRunnersArmBuildkit.enabled=false \
   --wait --timeout 5m
 
 # ARM64 (parma) — overlay values-arm64.yaml on top of values.yaml
 helm upgrade --install theia-arc-systems . \
   --namespace arc-systems --create-namespace \
   -f values-arm64.yaml \
+  --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
-  --wait --timeout 2m
+  --set arcRunnersExp.enabled=false \
+  --set arcRunnersArmBuildkit.enabled=false \
+  --wait --timeout 5m
 ```
 
-### Helm — Deploy Part 2 (Runners)
+### Helm — Deploy Part 2 (BuildKit Runner Sets)
 
 ```bash
-# AMD64
+# AMD64 BuildKit runner set on theia-prod
 helm upgrade --install theia-arc-runners . \
   --namespace arc-runners \
-  --set cacheServer.enabled=false \
+  --set cache-server.enabled=false \
   --set arcController.enabled=false \
-  --set zot.enabled=false \
-  --set arcRunners.enabled=true \
-  --wait --timeout 2m
+  --set arcRunners.enabled=false \
+  --set arcRunnersArm.enabled=false \
+  --set arcRunnersExp.enabled=true \
+  --set arcRunnersArmBuildkit.enabled=false \
+  --wait --timeout 10m
 
-# ARM64
+# ARM64 BuildKit runner set on parma
 helm upgrade --install theia-arc-runners . \
   --namespace arc-runners \
   -f values-arm64.yaml \
-  --set cacheServer.enabled=false \
+  --set cache-server.enabled=false \
   --set arcController.enabled=false \
-  --set zot.enabled=false \
-  --set arcRunnersArm.enabled=true \
-  --wait --timeout 2m
+  --set arcRunners.enabled=false \
+  --set arcRunnersArm.enabled=false \
+  --set arcRunnersExp.enabled=false \
+  --set arcRunnersArmBuildkit.enabled=true \
+  --wait --timeout 10m
+```
+
+### Helm — Deploy Part 3 (Zot standalone on parma)
+
+```bash
+cd helm-chart/theia-zot
+
+helm upgrade --install theia-zot . \
+  --namespace zot-system --create-namespace \
+  -f values.yaml \
+  -f values-parma.yaml \
+  --wait --timeout 10m
 ```
 
 ### Verify Deployment
@@ -70,13 +89,21 @@ kubectl get pods -n arc-systems
 kubectl get pods -n arc-runners
 kubectl get autoscalingrunnersets -n arc-runners
 kubectl get pvc -n arc-systems
+kubectl get pvc -n zot-system
+
+# BuildKit workers
+kubectl get pods -n buildkit-exp   # theia-prod
+kubectl get pods -n buildkit       # parma
 ```
 
-### Helm Lint (local validation)
+### Helm Lint / Template Validation (local)
 
 ```bash
 helm lint helm-chart/theia-arc-bundle/
 helm template helm-chart/theia-arc-bundle/ | kubectl apply --dry-run=client -f -
+
+helm lint helm-chart/theia-zot/
+helm template helm-chart/theia-zot/ | kubectl apply --dry-run=client -f -
 ```
 
 ### Uninstall (order matters — runners before controller)
@@ -84,7 +111,8 @@ helm template helm-chart/theia-arc-bundle/ | kubectl apply --dry-run=client -f -
 ```bash
 helm uninstall theia-arc-runners -n arc-runners
 helm uninstall theia-arc-systems -n arc-systems
-kubectl delete namespace arc-runners arc-systems
+helm uninstall theia-zot -n zot-system
+kubectl delete namespace arc-runners arc-systems zot-system
 ```
 
 ---
@@ -94,83 +122,66 @@ kubectl delete namespace arc-runners arc-systems
 ```
 .
 ├── helm-chart/
-│   └── theia-arc-bundle/          # Umbrella Helm chart
-│       ├── Chart.yaml             # Chart metadata + dependencies
-│       ├── values.yaml            # AMD64 defaults (theia-prod)
-│       ├── values-arm64.yaml      # ARM64 overrides (parma)
-│       ├── templates/
-│       │   ├── _helpers.tpl       # Helm template helpers
-│       │   ├── namespace.yaml     # arc-systems / arc-runners namespaces
-│       │   ├── rbac.yaml          # ServiceAccounts + Role + RoleBindings
-│       │   └── external-secret-github.yaml  # Optional: ExternalSecrets integration
-│       └── charts/
-│           ├── gha-runner-scale-set-0.9.3.tgz
-│           ├── gha-runner-scale-set-controller-0.9.3.tgz
-│           ├── zot-0.1.98.tgz
-│           └── github-actions-cache-server/   # Local subchart (vendored)
-├── .github/workflows/
-│   ├── deploy-manual.yml          # Workflow dispatch trigger
-│   └── deploy-runners.yml         # Reusable deployment workflow
-└── docs/                          # Documentation (may be outdated — trust manifests)
+│   ├── theia-arc-bundle/          # Umbrella Helm chart (controller/cache/runner sets)
+│   │   ├── Chart.yaml             # Chart metadata + dependencies
+│   │   ├── values.yaml            # AMD64 defaults (theia-prod)
+│   │   ├── values-arm64.yaml      # ARM64 overrides (parma)
+│   │   ├── templates/
+│   │   │   ├── _helpers.tpl       # Helm template helpers
+│   │   │   ├── namespace.yaml     # arc-systems / arc-runners namespaces
+│   │   │   ├── rbac.yaml          # ServiceAccounts + Role + RoleBindings
+│   │   │   └── external-secret-github.yaml  # Optional: ExternalSecrets integration
+│   │   └── charts/
+│   │       ├── gha-runner-scale-set-0.9.3.tgz
+│   │       ├── gha-runner-scale-set-controller-0.9.3.tgz
+│   │       └── github-actions-cache-server/   # Local subchart (vendored)
+│   └── theia-zot/                 # Standalone Zot Helm wrapper chart
+├── infra/
+│   ├── theia-prod/buildkit-exp/   # AMD64 BuildKit StatefulSet manifests
+│   └── parma/buildkit/            # ARM64 BuildKit StatefulSet manifests
+└── docs/                          # Operational plans and architecture notes
 ```
 
 ---
 
-## Architecture (ground truth: read from manifests)
+## Architecture (ground truth: manifests + values files)
 
-**Two Helm releases must be deployed separately** — Helm 3 cannot deploy subcharts into different namespaces in one release:
+Three deployable releases/components are used:
 
-- **Part 1** (`theia-arc-systems` release, `arc-systems` ns): ARC controller, GitHub Actions Cache Server, Zot (AMD64 only)
-- **Part 2** (`theia-arc-runners` release, `arc-runners` ns): AutoscalingRunnerSet only
+- **Part 1** (`theia-arc-systems`, `arc-systems`): ARC controller + GitHub Actions Cache Server
+- **Part 2** (`theia-arc-runners`, `arc-runners`): BuildKit-focused AutoscalingRunnerSet(s)
+- **Part 3** (`theia-zot`, `zot-system`): Zot pull-through registry on parma
 
-**The Part 1 release name MUST be `theia-arc-systems`** — the controller ServiceAccount is named `theia-arc-systems-gha-rs-controller` and Part 2 references it by exact name in `values.yaml`.
+**The Part 1 release name MUST be `theia-arc-systems`** — runner sets reference controller SA `theia-arc-systems-gha-rs-controller` by exact name.
 
-**Registry caching:** Zot pull-through cache (AMD64 only, `zot.enabled: true` in `values.yaml`). Zot is **disabled on parma** (`zot.enabled: false` in `values-arm64.yaml`). parma runners reach theia-prod's Zot via NodePort `131.159.88.30:30081`.
+**Registry caching:** Zot is centralized on parma and consumed by both clusters via NodePort `131.159.88.117:30081`.
 
-**Cache server:** `github-actions-cache-server` subchart deployed in `arc-systems`. Runners point to it via `ACTIONS_RESULTS_URL` and `CUSTOM_ACTIONS_RESULTS_URL` env vars.
+**Build execution:** GitHub jobs run on ARC runners with DinD + runner containers. Docker builds are routed by workflow logic to stateful BuildKit workers:
 
-**Runner pods:** Manual DinD sidecar pattern — `dind` + `runner` containers sharing `emptyDir` volumes. ARM64 runners use `emptyDir.medium: Memory` (30Gi) for the work volume.
-
----
-
-## Helm / YAML Conventions
-
-### values.yaml structure
-
-- `global.storageClass` — storage class for all PVCs (`csi-rbd-sc` AMD64, `longhorn` ARM64)
-- `global.nodeSelector` — arch selector applied to all pods
-- `arcController.enabled` / `arcRunners.enabled` / `arcRunnersArm.enabled` — feature flags for split deployment
-- `cache-server.*` — passed to the `github-actions-cache-server` subchart
-- `zot.*` — passed to the Zot subchart (AMD64 only)
-
-### Helm template style
-
-- Use `{{- include "theia-arc-bundle.labels" . | nindent N }}` for standard labels on every resource
-- Gate resources with `{{- if .Values.<flag> }}` — never deploy conditionally unneeded resources
-- Helm hooks use `"helm.sh/hook": post-install,post-upgrade` and `before-hook-creation` delete policy
-- Indent YAML blocks with `nindent` for inline template values
-
-### Kubernetes YAML style
-
-- Always set `namespace:` explicitly on every resource
-- Use `kubernetes.io/arch` node selector (not `beta.kubernetes.io/arch`)
-- Resources: always specify both `requests` and `limits`
-- Label all resources with `app.kubernetes.io/*` labels
-
-### Naming conventions
-
-- Helm release names: `theia-arc-systems` (Part 1), `theia-arc-runners` (Part 2)
-- Namespaces: `arc-systems` (controller tier), `arc-runners` (runner tier)
-- ServiceAccounts: `arc-runner-set-stateless-sa` (AMD64), `arc-runner-set-stateless-arm-sa` (ARM64)
-- Secret: `github-arc-secret` in `arc-runners`
-- Runner scale set names: `arc-runner-set-stateless` (AMD64), `arc-runner-set-arm64` (ARM64)
+- theia-prod workers: namespace `buildkit-exp` (`csi-rbd-sc`, 7 replicas)
+- parma workers: namespace `buildkit` (`longhorn`, 7 replicas)
 
 ---
 
-## Key Operational Notes
+## Naming conventions
 
-- **Uninstall order is critical**: always remove runners (Part 2) before the controller (Part 1). Doing it in reverse leaves ARC runners stuck with finalizers that block namespace deletion.
-- **`createNamespaces: false`** on parma (ARM64) — the `arc-runners` namespace is pre-created with Helm ownership labels; Helm SSA will fail if the chart tries to recreate it.
-- **`externalSecrets.enabled: false`** by default — auth secret is created manually or via CI (`kubectl create secret`).
-- docs/ may be out of date — always trust `values.yaml`, `values-arm64.yaml`, and the templates as ground truth.
-- Zot is only deployed on `theia-prod` (AMD64). parma runners reach Zot cross-cluster via NodePort `131.159.88.30:30081`.
+- Helm release names:
+  - `theia-arc-systems` (Part 1)
+  - `theia-arc-runners` (Part 2)
+  - `theia-zot` (Part 3)
+- Namespaces:
+  - `arc-systems`, `arc-runners`, `zot-system`
+  - `buildkit-exp` (theia-prod BuildKit), `buildkit` (parma BuildKit)
+- Active runner set names:
+  - `arc-buildkit-eduide-amd64`
+  - `arc-buildkit-eduide-arm64`
+
+---
+
+## Operational Notes
+
+- **Uninstall order is critical**: remove runners before controller to avoid ARC finalizer deadlocks.
+- `createNamespaces: false` on parma is intentional to avoid Helm SSA ownership conflicts for `arc-runners`.
+- `externalSecrets.enabled: false` by default; auth secrets are managed explicitly.
+- Keep docs aligned with manifests; when mismatched, trust `values.yaml`, `values-arm64.yaml`, and `infra/**` YAML.
+- Zot startup can fail on low inotify settings (`failed to create a new hot reloader`); raise node inotify limits and restart pod.

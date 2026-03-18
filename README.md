@@ -4,118 +4,146 @@ Infrastructure-as-code for deploying **GitHub Actions self-hosted runners** usin
 
 ## Architecture
 
-Stateless runners backed by a **Zot pull-through cache** (Docker Hub) and a **GitHub Actions Cache Server**.
+BuildKit-focused runner sets backed by stateful BuildKit workers, a shared Zot pull-through cache (Docker Hub), and a GitHub Actions Cache Server.
 
-| Cluster | Architecture | Runners | Storage Class | Zot Mirror |
-|---------|--------------|---------|---------------|------------|
-| theia-prod | AMD64 | `arc-runner-set-stateless` | `csi-rbd-sc` | In-cluster (`theia-arc-systems-zot.arc-systems.svc.cluster.local:5000`) |
-| parma | ARM64 | `arc-runner-set-arm64` | `longhorn` | Cross-cluster NodePort (`131.159.88.30:30081`) |
+| Cluster | Architecture | Runner Set | BuildKit Namespace | BuildKit Storage Class | Zot Mirror |
+|---------|--------------|------------|--------------------|------------------------|------------|
+| theia-prod | AMD64 | `arc-buildkit-eduide-amd64` | `buildkit-exp` | `csi-rbd-sc` | `131.159.88.117:30081` |
+| parma | ARM64 | `arc-buildkit-eduide-arm64` | `buildkit` | `longhorn` | `131.159.88.117:30081` |
 
 ## Features
 
-- Stateless Runner Scale Sets that scale 10–50 runners per cluster
-- Zot pull-through cache for `docker.io` (eliminates Docker Hub rate limits)
+- ARC runner sets for EduIDE organization workloads
+- Stateful BuildKit workers (7 replicas per cluster, 100Gi per worker)
+- Zot pull-through cache for `docker.io` (removes Docker Hub rate-limit pressure)
 - GitHub Actions Cache Server for `actions/cache` compatibility (200Gi PVC)
-- Memory-backed work volume on parma (30Gi RAM per runner, ~1000x faster than disk I/O)
-- Organization-wide runners for `ls1intum` repositories
+- Memory-backed work volume on parma runners (`emptyDir.medium: Memory`, 30Gi)
 
 ## Components
 
 ### Zot Registry Cache
 
-Zot is deployed in `arc-systems` on theia-prod only. It proxies Docker Hub transparently using the `--registry-mirror` protocol — no workflow changes required.
+Zot is deployed as a standalone release on parma:
 
-DinD runner pods are configured with:
+- release: `theia-zot`
+- namespace: `zot-system`
+- storage: Longhorn PVC (100Gi)
+- service: NodePort `30081`
+
+Runner DinD containers are configured with:
+
+```text
+--registry-mirror=http://131.159.88.117:30081
+--insecure-registry=131.159.88.117:30081
 ```
---registry-mirror=http://<zot-addr>
---insecure-registry=<zot-addr>
-```
-
-All `docker pull` calls route through Zot automatically. On cache miss, Zot fetches from `registry-1.docker.io`, caches the result, and serves it. Cache is retained for 30 days (720h) with built-in GC.
-
-parma runners reach the same Zot instance via the NodePort at `131.159.88.30:30081`.
 
 ### GitHub Actions Cache Server
 
-Deployed in `arc-systems`. Runners reference it via `ACTIONS_RESULTS_URL` and `CUSTOM_ACTIONS_RESULTS_URL`. Drop-in replacement for GitHub's hosted cache service, backed by a 200Gi PVC with 90-day cleanup.
+Deployed in `arc-systems`. Runners use:
 
-### Runner Configuration
+- `ACTIONS_RESULTS_URL`
+- `CUSTOM_ACTIONS_RESULTS_URL`
 
-Runners use a manual DinD sidecar pattern:
+Backed by a 200Gi PVC with cleanup policy.
 
-- `init-dind-externals` — copies runner binaries into a shared volume
-- `dind` — Docker daemon, privileged, with `--registry-mirror` and `--insecure-registry` pointing to Zot
-- `runner` — `ghcr.io/falcondev-oss/actions-runner:latest`, connects to the daemon via shared Unix socket
+### Runner + BuildKit Model
+
+Runner pods keep the DinD + runner sidecar layout. Docker builds are routed to remote BuildKit workers using workflow-provided routing logic and runner env:
+
+- `BUILDKIT_NAMESPACE`
+- `BUILDKIT_NUM_WORKERS`
 
 ## Deployment
 
-See [AGENTS.md](AGENTS.md) for the canonical deploy/upgrade commands.
+See [AGENTS.md](AGENTS.md) for the canonical commands and safety notes.
 
 ### Prerequisites
 
-- `kubectl` configured for target cluster (`theia-prod` or `parma`)
+- `kubectl` configured for target cluster (`theia-prod` / `parma`)
 - Helm 3.14+
-- GitHub auth secret pre-created in `arc-runners` namespace:
+- GitHub auth secret in `arc-runners`:
 
 ```bash
 # GitHub App (recommended)
-kubectl create secret generic github-arc-secret \
+kubectl create secret generic github-arc-secret-eduidec \
   --namespace=arc-runners \
   --from-literal=github_app_id="<APP_ID>" \
   --from-literal=github_app_installation_id="<INSTALLATION_ID>" \
   --from-file=github_app_private_key=<path-to-private-key.pem>
 
-# or Personal Access Token
-kubectl create secret generic github-arc-secret \
+# or PAT
+kubectl create secret generic github-arc-secret-eduidec \
   --namespace=arc-runners \
   --from-literal=github_token="ghp_xxxxxxxxxxxx"
 ```
 
-### Deploy AMD64 (theia-prod)
+### Deploy theia-prod (AMD64 BuildKit runners)
 
 ```bash
 kubectl config use-context theia-prod
 cd helm-chart/theia-arc-bundle
 
-# Part 1: Controller + Cache Server + Zot
+# Part 1: Controller + Cache Server
 helm upgrade --install theia-arc-systems . \
   --namespace arc-systems --create-namespace \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
+  --set arcRunnersExp.enabled=false \
+  --set arcRunnersArmBuildkit.enabled=false \
   --wait --timeout 5m
 
-# Part 2: Runners (zot.enabled=false — Zot is owned by Part 1)
+# Part 2: AMD64 BuildKit runner set
 helm upgrade --install theia-arc-runners . \
   --namespace arc-runners \
-  --set cacheServer.enabled=false \
+  --set cache-server.enabled=false \
   --set arcController.enabled=false \
-  --set zot.enabled=false \
-  --set arcRunners.enabled=true \
-  --wait --timeout 2m
+  --set arcRunners.enabled=false \
+  --set arcRunnersArm.enabled=false \
+  --set arcRunnersExp.enabled=true \
+  --set arcRunnersArmBuildkit.enabled=false \
+  --wait --timeout 10m
 ```
 
-### Deploy ARM64 (parma)
+### Deploy parma (ARM64 BuildKit runners)
 
 ```bash
 kubectl config use-context parma
 cd helm-chart/theia-arc-bundle
 
-# Part 1: Controller + Cache Server (no Zot on parma)
+# Part 1: Controller + Cache Server
 helm upgrade --install theia-arc-systems . \
   --namespace arc-systems --create-namespace \
   -f values-arm64.yaml \
+  --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
-  --wait --timeout 2m
+  --set arcRunnersExp.enabled=false \
+  --set arcRunnersArmBuildkit.enabled=false \
+  --wait --timeout 5m
 
-# Part 2: Runners
+# Part 2: ARM64 BuildKit runner set
 helm upgrade --install theia-arc-runners . \
   --namespace arc-runners \
   -f values-arm64.yaml \
-  --set cacheServer.enabled=false \
+  --set cache-server.enabled=false \
   --set arcController.enabled=false \
-  --set zot.enabled=false \
-  --set arcRunnersArm.enabled=true \
-  --wait --timeout 2m
+  --set arcRunners.enabled=false \
+  --set arcRunnersArm.enabled=false \
+  --set arcRunnersExp.enabled=false \
+  --set arcRunnersArmBuildkit.enabled=true \
+  --wait --timeout 10m
+```
+
+### Deploy Zot (standalone)
+
+```bash
+kubectl config use-context parma
+cd helm-chart/theia-zot
+
+helm upgrade --install theia-zot . \
+  --namespace zot-system --create-namespace \
+  -f values.yaml \
+  -f values-parma.yaml \
+  --wait --timeout 10m
 ```
 
 ### Verify
@@ -125,55 +153,29 @@ kubectl get pods -n arc-systems
 kubectl get pods -n arc-runners
 kubectl get autoscalingrunnersets -n arc-runners
 kubectl get pvc -n arc-systems
+kubectl get pvc -n zot-system
+
+# BuildKit workers
+kubectl --context=theia-prod get pods -n buildkit-exp
+kubectl --context=parma get pods -n buildkit
 ```
 
-Expected AutoScalingRunnerSets:
-- `theia-prod`: `arc-runner-set-stateless`
-- `parma`: `arc-runner-set-arm64`
+Expected runner sets:
+
+- `theia-prod`: `arc-buildkit-eduide-amd64`
+- `parma`: `arc-buildkit-eduide-arm64`
 
 ## Documentation
 
-- [Architecture](docs/ARCHITECTURE_V2.md) — System design and caching strategy
-- [Troubleshooting](docs/TROUBLESHOOTING.md) — Common issues and solutions
+- [Architecture](docs/ARCHITECTURE_V2.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [BuildKit ARM64 deployment record](docs/DEPLOY_ARM64_STATEFUL_BUILDKIT_2026-03-17.md)
 
-## Cleanup and Maintenance
-
-### Uninstall (order matters — runners before controller)
+## Cleanup
 
 ```bash
 helm uninstall theia-arc-runners -n arc-runners
 helm uninstall theia-arc-systems -n arc-systems
-kubectl delete namespace arc-runners arc-systems
+helm uninstall theia-zot -n zot-system
+kubectl delete namespace arc-runners arc-systems zot-system
 ```
-
-### Removing Orphaned Resources
-
-```bash
-# Check for orphaned AutoScalingRunnerSets
-kubectl get autoscalingrunnersets -n arc-runners
-
-# Delete orphaned runner set (terminates associated pods)
-kubectl delete autoscalingrunnersets <old-name> -n arc-runners
-
-# Then delete the orphaned service account
-kubectl delete serviceaccount <old-sa-name> -n arc-runners
-```
-
-### Verifying Active Infrastructure
-
-```bash
-# theia-prod
-kubectl --context=theia-prod get autoscalingrunnersets -n arc-runners
-kubectl --context=theia-prod get pods -n arc-runners
-
-# parma
-kubectl --context=parma get autoscalingrunnersets -n arc-runners
-kubectl --context=parma get pods -n arc-runners
-```
-
-## Related Projects
-
-- [artemis-theia-blueprints](https://github.com/ls1intum/artemis-theia-blueprints) — Theia IDE images
-- [ls1intum/.github](https://github.com/ls1intum/.github) — Reusable workflows
-- [Actions Runner Controller](https://github.com/actions/actions-runner-controller) — Upstream ARC project
-- [Zot Registry](https://zotregistry.dev/) — OCI-native pull-through cache

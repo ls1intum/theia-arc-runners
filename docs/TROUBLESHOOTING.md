@@ -39,15 +39,15 @@ Zot is the pull-through cache for Docker Hub. If runners still hit rate limits:
 
 ```bash
 # 1. Confirm Zot pod is Running
-kubectl get pods -n arc-systems | grep zot
+kubectl get pods -n zot-system | grep zot
 
 # 2. Confirm dind is using the registry mirror
 kubectl get pod -n arc-runners <runner-pod> \
   -o jsonpath='{.spec.containers[?(@.name=="dind")].args}'
-# Expected: [..., "--registry-mirror=http://theia-arc-systems-zot.arc-systems.svc.cluster.local:5000", ...]
+# Expected: [..., "--registry-mirror=http://131.159.88.117:30081", ...]
 
 # 3. Check Zot logs for sync activity
-kubectl logs -n arc-systems -l app.kubernetes.io/name=zot --tail=50
+kubectl logs -n zot-system -l app.kubernetes.io/name=zot --tail=50
 # Look for: "sync: on-demand sync for image library/alpine"
 ```
 
@@ -55,12 +55,12 @@ If Zot is down, runners will fall back to direct Docker Hub pulls (and hit rate 
 
 ### Image pull errors on parma (ARM64)
 
-Parma reaches Zot on theia-prod via NodePort `131.159.88.30:30081`. If that node is unreachable or Zot is down on theia-prod, ARM64 runners will hit Docker Hub directly.
+Both clusters reach Zot on parma via NodePort `131.159.88.117:30081`. If that endpoint is unreachable, runners will hit Docker Hub directly.
 
 ```bash
 # From a parma pod, test Zot reachability
 kubectl run -it --rm debug --image=alpine --restart=Never --context=parma -- \
-  wget -qO- http://131.159.88.30:30081/v2/
+  wget -qO- http://131.159.88.117:30081/v2/
 # Expected: {} (empty JSON — Zot v2 API root)
 ```
 
@@ -70,13 +70,13 @@ If `docker pull image@sha256:...` fails from the cache, Zot may be returning an 
 
 ```bash
 # Check Zot logs for conversion errors
-kubectl logs -n arc-systems -l app.kubernetes.io/name=zot --tail=100 | grep -i digest
+kubectl logs -n zot-system -l app.kubernetes.io/name=zot --tail=100 | grep -i digest
 ```
 
 The Zot config sets `preserveDigest: false` to allow manifest conversion. If errors persist, verify the config is applied:
 
 ```bash
-kubectl exec -n arc-systems deploy/theia-arc-systems-zot -- cat /etc/zot/config.json | grep preserveDigest
+kubectl exec -n zot-system statefulset/theia-zot -- cat /etc/zot/config.json | grep preserveDigest
 ```
 
 ---
@@ -137,20 +137,15 @@ kubectl annotate namespace arc-runners \
 
 Then re-run the `helm install` / `helm upgrade` command.
 
-### `helm upgrade` fails with "port already allocated" (Zot NodePort conflict)
+### `helm upgrade` fails in `theia-zot` with startup crash
 
-Part 2 (`theia-arc-runners`) was run without `--set zot.enabled=false`. Zot is owned by Part 1 (`theia-arc-systems` in `arc-systems`); when Part 2 also tries to create the Zot NodePort service in `arc-runners`, Kubernetes rejects it.
-
-Always pass `--set zot.enabled=false` for Part 2 upgrades:
+If Zot fails with `failed to create a new hot reloader` / `too many open files`, increase node inotify limits on the parma node and restart Zot:
 
 ```bash
-helm upgrade theia-arc-runners . \
-  --namespace arc-runners \
-  --set cacheServer.enabled=false \
-  --set arcController.enabled=false \
-  --set zot.enabled=false \
-  --set arcRunners.enabled=true \
-  --wait --timeout 2m
+kubectl --context parma debug node/arm-altra-23-parma --image=busybox -- \
+  chroot /host sh -c 'sysctl -w fs.inotify.max_user_instances=1024; sysctl -w fs.inotify.max_user_watches=1048576; sysctl -w fs.inotify.max_queued_events=32768'
+
+kubectl --context parma delete pod -n zot-system theia-zot-0
 ```
 
 ---
@@ -199,6 +194,7 @@ kubectl get pods -n arc-runners
 
 # PVCs (cache server + Zot)
 kubectl get pvc -n arc-systems
+kubectl get pvc -n zot-system
 
 # Controller logs
 kubectl logs -n arc-systems -l app.kubernetes.io/name=gha-runner-scale-set-controller --tail=100
@@ -210,8 +206,8 @@ kubectl logs -n arc-runners <runner-pod> -c runner --follow
 kubectl logs -n arc-runners <runner-pod> -c dind
 
 # Zot cache activity
-kubectl logs -n arc-systems -l app.kubernetes.io/name=zot --tail=100
+kubectl logs -n zot-system -l app.kubernetes.io/name=zot --tail=100
 
 # Zot PVC usage
-kubectl exec -n arc-systems -l app.kubernetes.io/name=zot -- df -h /var/lib/registry
+kubectl exec -n zot-system -l app.kubernetes.io/name=zot -- df -h /var/lib/registry
 ```
