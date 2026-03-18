@@ -10,12 +10,12 @@ arcController:
   enabled: true
 
 arcRunners:
-  enabled: true
-  githubConfigUrl: "https://github.com/ls1intum"
-  githubConfigSecret: "github-arc-secret"
+  enabled: false
+  githubConfigUrl: "https://github.com/EduIDE"
+  githubConfigSecret: "github-arc-secret-eduidec"
   minRunners: 10
   maxRunners: 50
-  runnerScaleSetName: "arc-runner-set-stateless"
+  runnerScaleSetName: "arc-stateless-eduide"
   controllerServiceAccount:
     namespace: arc-systems
     # This must match <Part-1-release-name>-gha-rs-controller.
@@ -39,9 +39,8 @@ arcRunners:
             - --host=unix:///var/run/docker.sock
             - --group=1001
             # Route docker.io pulls through Zot pull-through cache to avoid Docker Hub rate limits.
-            # Uses the NodePort URL so the same address works from both theia-prod and parma clusters.
-            - --registry-mirror=http://131.159.88.30:30081
-            - --insecure-registry=131.159.88.30:30081
+            - --registry-mirror=http://131.159.88.117:30081
+            - --insecure-registry=131.159.88.117:30081
           securityContext:
             privileged: true
           volumeMounts:
@@ -91,11 +90,11 @@ arcRunners:
 
 arcRunnersArm:
   enabled: false
-  githubConfigUrl: "https://github.com/ls1intum"
-  githubConfigSecret: "github-arc-secret"
+  githubConfigUrl: "https://github.com/EduIDE"
+  githubConfigSecret: "github-arc-secret-eduidec"
   minRunners: 10
   maxRunners: 50
-  runnerScaleSetName: "arc-runner-set-arm64"
+  runnerScaleSetName: "arc-stateless-eduide-arm64"
   controllerServiceAccount:
     namespace: arc-systems
     # Must match <Part-1-release-name>-gha-rs-controller (release name must be theia-arc-systems)
@@ -117,9 +116,9 @@ arcRunnersArm:
             - dockerd
             - --host=unix:///var/run/docker.sock
             - --group=1001
-            # Route docker.io pulls through theia-prod Zot NodePort reachable cross-cluster.
-            - --registry-mirror=http://131.159.88.30:30081
-            - --insecure-registry=131.159.88.30:30081
+            # Route docker.io pulls through Zot NodePort reachable cross-cluster.
+            - --registry-mirror=http://131.159.88.117:30081
+            - --insecure-registry=131.159.88.117:30081
           securityContext:
             privileged: true
           volumeMounts:
@@ -163,24 +162,22 @@ arcRunnersArm:
         - name: dind-externals
           emptyDir: {}
 
-# Experimental runner set that routes docker builds to stateful BuildKit workers.
-# BuildKit workers live in the buildkit-exp namespace (raw manifests, not Helm).
-# Workflows opt in explicitly with: runs-on: arc-runner-set-buildkit-exp
-# Hash key: GITHUB_REPOSITORY + "::" + dockerfile_path → deterministic worker selection.
-# Set enabled: true when buildkit-exp namespace is deployed on theia-prod.
+# AMD64 BuildKit runner set that routes docker builds to stateful BuildKit workers.
+# BuildKit workers live in the buildkit-exp namespace (raw manifests).
+# Workflows opt in explicitly with: runs-on: arc-buildkit-eduide-amd64
 arcRunnersExp:
-  enabled: false
+  enabled: true
   githubConfigUrl: "https://github.com/EduIDE"
   githubConfigSecret: "github-arc-secret-eduidec"
   minRunners: 10
   maxRunners: 50
-  runnerScaleSetName: "arc-runner-set-buildkit-exp"
+  runnerScaleSetName: "arc-buildkit-eduide-amd64"
   controllerServiceAccount:
     namespace: arc-systems
     name: theia-arc-systems-gha-rs-controller
   buildkit:
     namespace: buildkit-exp
-    numWorkers: 5
+    numWorkers: 7
   template:
     spec:
       serviceAccountName: arc-runner-set-stateless-sa
@@ -198,8 +195,8 @@ arcRunnersExp:
             - dockerd
             - --host=unix:///var/run/docker.sock
             - --group=1001
-            - --registry-mirror=http://131.159.88.30:30081
-            - --insecure-registry=131.159.88.30:30081
+            - --registry-mirror=http://131.159.88.117:30081
+            - --insecure-registry=131.159.88.117:30081
           securityContext:
             privileged: true
           volumeMounts:
@@ -226,7 +223,7 @@ arcRunnersExp:
             - name: BUILDKIT_NAMESPACE
               value: buildkit-exp
             - name: BUILDKIT_NUM_WORKERS
-              value: "5"
+              value: "7"
           volumeMounts:
             - name: work
               mountPath: /home/runner/_work
@@ -249,20 +246,20 @@ arcRunnersExp:
 
 # ARM64 BuildKit runner set for parma.
 # Routes docker builds to stateful BuildKit workers in the buildkit namespace.
-# Workflows opt in explicitly with: runs-on: arc-runner-set-arm64-buildkit
+# Workflows opt in explicitly with: runs-on: arc-buildkit-eduide-arm64
 arcRunnersArmBuildkit:
   enabled: false
   githubConfigUrl: "https://github.com/EduIDE"
   githubConfigSecret: "github-arc-secret-eduidec"
   minRunners: 10
   maxRunners: 50
-  runnerScaleSetName: "arc-runner-set-arm64-buildkit"
+  runnerScaleSetName: "arc-buildkit-eduide-arm64"
   controllerServiceAccount:
     namespace: arc-systems
     name: theia-arc-systems-gha-rs-controller
   buildkit:
     namespace: buildkit
-    numWorkers: 5
+    numWorkers: 7
   template:
     spec:
       serviceAccountName: arc-runner-set-stateless-arm-sa
@@ -280,8 +277,8 @@ arcRunnersArmBuildkit:
             - dockerd
             - --host=unix:///var/run/docker.sock
             - --group=1001
-            - --registry-mirror=http://131.159.88.30:30081
-            - --insecure-registry=131.159.88.30:30081
+            - --registry-mirror=http://131.159.88.117:30081
+            - --insecure-registry=131.159.88.117:30081
           securityContext:
             privileged: true
           volumeMounts:
@@ -306,7 +303,7 @@ arcRunnersArmBuildkit:
             - name: BUILDKIT_NAMESPACE
               value: buildkit
             - name: BUILDKIT_NUM_WORKERS
-              value: "5"
+              value: "7"
           volumeMounts:
             - name: work
               mountPath: /home/runner/_work
@@ -373,93 +370,4 @@ externalSecrets:
       key: "github/actions-pat"
       property: "token"
 
-# Zot pull-through cache for Docker Hub.
-# Deployed in arc-systems on theia-prod only.
-# theia-prod runners: http://theia-arc-systems-zot.arc-systems.svc.cluster.local:5000
-# parma runners:      http://131.159.88.30:30081 (NodePort on theia-prod node)
-zot:
-  enabled: true
-  mountConfig: true
-  configFiles:
-    config.json: |-
-      {
-        "distSpecVersion": "1.1.0",
-        "storage": {
-          "rootDirectory": "/var/lib/registry",
-          "dedupe": true,
-          "gc": true,
-          "gcDelay": "1h",
-          "gcInterval": "6h",
-          "retention": {
-            "policies": [
-              {
-                "repositories": ["**"],
-                "keepTags": [
-                  {
-                    "mostRecentlyPulledCount": 100,
-                    "pulledWithin": "720h"
-                  }
-                ]
-              }
-            ]
-          }
-        },
-        "http": {
-          "address": "0.0.0.0",
-          "port": "5000",
-          "Compat": true
-        },
-        "log": {
-          "level": "info"
-        },
-        "extensions": {
-          "sync": {
-            "enable": true,
-            "credentialsFile": "/etc/zot-credentials/credentials.json",
-            "registries": [
-              {
-                "urls": ["https://registry-1.docker.io"],
-                "onDemand": true,
-                "pollInterval": "24h",
-                "tlsVerify": true,
-                "preserveDigest": true,
-                "maxRetries": 3,
-                "retryDelay": "1m",
-                "content": [
-                  {
-                    "prefix": "**"
-                  }
-                ]
-              }
-            ]
-          }
-        }
-      }
-  extraVolumes:
-    - name: zot-credentials
-      secret:
-        secretName: zot-dockerhub-credentials
-  extraVolumeMounts:
-    - name: zot-credentials
-      mountPath: /etc/zot-credentials
-      readOnly: true
-  persistence: true
-  pvc:
-    create: true
-    storage: 100Gi
-    storageClassName: "csi-rbd-sc"
-    accessModes:
-      - ReadWriteOnce
-  service:
-    type: NodePort
-    port: 5000
-    nodePort: 30081
-  resources:
-    requests:
-      cpu: 200m
-      memory: 512Mi
-    limits:
-      cpu: 2000m
-      memory: 4Gi
-  nodeSelector:
-    kubernetes.io/arch: amd64
+# Zot is deployed via standalone `theia-zot` chart in `zot-system`.

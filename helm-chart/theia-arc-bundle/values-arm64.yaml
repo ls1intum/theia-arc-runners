@@ -14,7 +14,7 @@ arcRunners:
   enabled: false
 
 arcRunnersArm:
-  enabled: true
+  enabled: false
 
 cache-server:
   enabled: true
@@ -27,9 +27,6 @@ cache-server:
     storage: 200Gi
   nodeSelector:
     kubernetes.io/arch: arm64
-
-zot:
-  enabled: false
 
 arcRunnersExp:
   enabled: false

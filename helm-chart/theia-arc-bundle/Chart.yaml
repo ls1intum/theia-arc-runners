@@ -53,10 +53,3 @@ dependencies:
     version: 1.0.0
     alias: cache-server
     condition: cache-server.enabled
-
-  # Zot registry (pull-through proxy cache for Docker Hub)
-  - name: zot
-    version: "0.1.98"
-    repository: "https://zotregistry.dev/helm-charts"
-    alias: zot
-    condition: zot.enabled

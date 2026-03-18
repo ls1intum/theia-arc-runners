@@ -11,11 +11,11 @@ dependencies:
 - name: gha-runner-scale-set
   repository: oci://ghcr.io/actions/actions-runner-controller-charts
   version: 0.9.3
+- name: gha-runner-scale-set
+  repository: oci://ghcr.io/actions/actions-runner-controller-charts
+  version: 0.9.3
 - name: github-actions-cache-server
   repository: ""
   version: 1.0.0
-- name: zot
-  repository: https://zotregistry.dev/helm-charts
-  version: 0.1.98
-digest: sha256:7f02d3fa003545cf9581dbd084db2332aa9572b59e2ffba9428f24d5330b591e
-generated: "2026-03-12T13:00:21.815801+01:00"
+digest: sha256:5b026fee1d0af6bf7dc74111300025fb856a01921bfd8286fc5ab12dad138b53
+generated: "2026-03-17T15:29:46.034272+01:00"

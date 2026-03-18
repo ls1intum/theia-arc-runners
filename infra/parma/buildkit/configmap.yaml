@@ -11,8 +11,8 @@ data:
   buildkitd.toml: |
     # --- Registry mirrors (docker.io → Zot pull-through cache) ---
     [registry."docker.io"]
-      mirrors = ["http://131.159.88.30:30081"]
-    [registry."131.159.88.30:30081"]
+      mirrors = ["http://theia-zot.zot-system.svc.cluster.local:5000"]
+    [registry."theia-zot.zot-system.svc.cluster.local:5000"]
       http = true
 
     # --- Garbage collection ---

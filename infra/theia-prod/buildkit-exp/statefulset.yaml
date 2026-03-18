@@ -10,7 +10,7 @@ metadata:
 spec:
   serviceName: buildkitd
   podManagementPolicy: Parallel
-  replicas: 5
+  replicas: 7
   selector:
     matchLabels:
       app: buildkitd
@@ -22,6 +22,15 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/arch: amd64
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: buildkitd
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: buildkitd
           # Privileged variant — theia-prod runs kernel 5.4 (Ubuntu 20.04) which is below
