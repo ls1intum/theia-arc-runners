@@ -1,0 +1,85 @@
+zot:
+  mountConfig: true
+  configFiles:
+    config.json: |-
+      {
+        "distSpecVersion": "1.1.0",
+        "storage": {
+          "rootDirectory": "/var/lib/registry",
+          "dedupe": true,
+          "gc": true,
+          "gcDelay": "1h",
+          "gcInterval": "6h",
+          "retention": {
+            "policies": [
+              {
+                "repositories": ["**"],
+                "keepTags": [
+                  {
+                    "mostRecentlyPulledCount": 100,
+                    "pulledWithin": "720h"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "http": {
+          "address": "0.0.0.0",
+          "port": "5000",
+          "Compat": true
+        },
+        "log": {
+          "level": "info"
+        },
+        "extensions": {
+          "sync": {
+            "enable": true,
+            "credentialsFile": "/etc/zot-credentials/credentials.json",
+            "registries": [
+              {
+                "urls": ["https://registry-1.docker.io"],
+                "onDemand": true,
+                "pollInterval": "24h",
+                "tlsVerify": true,
+                "preserveDigest": true,
+                "maxRetries": 3,
+                "retryDelay": "1m",
+                "content": [
+                  {
+                    "prefix": "**"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+  extraVolumes:
+    - name: zot-credentials
+      secret:
+        secretName: zot-dockerhub-credentials
+  extraVolumeMounts:
+    - name: zot-credentials
+      mountPath: /etc/zot-credentials
+      readOnly: true
+  persistence: true
+  pvc:
+    create: true
+    storage: 100Gi
+    storageClassName: "csi-rbd-sc"
+    accessModes:
+      - ReadWriteOnce
+  service:
+    type: NodePort
+    port: 5000
+    nodePort: 30081
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  nodeSelector:
+    kubernetes.io/arch: amd64

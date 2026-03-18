@@ -1,0 +1,17 @@
+apiVersion: v2
+name: theia-zot
+description: Standalone Zot pull-through registry cache
+type: application
+version: 0.1.0
+appVersion: "1.0"
+home: https://github.com/ls1intum/theia-arc-runners
+sources:
+  - https://github.com/ls1intum/theia-arc-runners
+maintainers:
+  - name: ls1intum
+    url: https://github.com/ls1intum
+
+dependencies:
+  - name: zot
+    version: "0.1.98"
+    repository: "https://zotregistry.dev/helm-charts"

@@ -1,0 +1,9 @@
+zot:
+  pvc:
+    storageClassName: "longhorn"
+  nodeSelector:
+    kubernetes.io/arch: arm64
+  service:
+    type: NodePort
+    port: 5000
+    nodePort: 30081
