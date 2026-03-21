@@ -40,7 +40,6 @@ zot:
               {
                 "urls": ["https://registry-1.docker.io"],
                 "onDemand": true,
-                "pollInterval": "24h",
                 "tlsVerify": true,
                 "preserveDigest": true,
                 "maxRetries": 3,
