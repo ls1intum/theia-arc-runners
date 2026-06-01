@@ -65,7 +65,7 @@ zot:
   persistence: true
   pvc:
     create: true
-    storage: 250Gi
+    storage: 100Gi
     storageClassName: "csi-rbd-sc"
     accessModes:
       - ReadWriteOnce
