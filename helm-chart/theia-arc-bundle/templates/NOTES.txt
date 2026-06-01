@@ -4,13 +4,6 @@
 
 This Helm chart has deployed the following components:
 
-{{ if (index .Values "cache-server").enabled -}}
-GITHUB ACTIONS CACHE SERVER:
-  - Service URL: http://github-actions-cache-server.{{ .Release.Namespace }}.svc.cluster.local:3000/
-  - Storage: {{ (index .Values "cache-server").persistentVolumeClaim.storage | default "200Gi" }} PVC ({{ (index .Values "cache-server").config.storage.driver | default "filesystem" }})
-  - Cleanup: {{ (index .Values "cache-server").config.cacheCleanupOlderThanDays | default 90 }} days
-{{- end }}
-
 {{ if .Values.arcController.enabled -}}
 ARC CONTROLLER:
   - Namespace: arc-systems
@@ -23,7 +16,6 @@ ARC RUNNERS (AMD64):
   - Min Runners: {{ .Values.arcRunners.minRunners }}
   - Max Runners: {{ .Values.arcRunners.maxRunners }}
   - GitHub Org: {{ .Values.arcRunners.githubConfigUrl }}
-  - Cache: Configured via ACTIONS_CACHE_URL
 {{- end }}
 
 {{ if .Values.arcRunnersArm.enabled -}}
@@ -32,7 +24,6 @@ ARC RUNNERS (ARM64):
   - Min Runners: {{ .Values.arcRunnersArm.minRunners }}
   - Max Runners: {{ .Values.arcRunnersArm.maxRunners }}
   - GitHub Org: {{ .Values.arcRunnersArm.githubConfigUrl }}
-  - Cache: Configured via ACTIONS_CACHE_URL
 {{- end }}
 
 ========================================
@@ -43,18 +34,11 @@ Check all ARC pods:
   kubectl get pods -n arc-systems
   kubectl get pods -n arc-runners
 
-Check cache server:
-  kubectl get pods -n arc-systems -l app.kubernetes.io/name=github-actions-cache-server
-  kubectl get pvc -n arc-systems github-actions-cache-server
-
 Check runner scale sets:
   kubectl get autoscalingrunnersets -n arc-runners
 
 View controller logs:
   kubectl logs -n arc-systems -l app.kubernetes.io/name=gha-runner-scale-set-controller --tail=50
-
-View cache server logs:
-  kubectl logs -n arc-systems -l app.kubernetes.io/name=github-actions-cache-server --tail=50
 
 ========================================
 UPGRADE / ROLLBACK
@@ -75,21 +59,7 @@ TROUBLESHOOTING
 
 If workflows don't trigger runners:
   kubectl logs -n arc-systems -l app.kubernetes.io/name=gha-runner-scale-set-controller
-  kubectl get secret github-arc-secret -n arc-runners
-
-If cache is not working:
-  kubectl logs -n arc-systems -l app.kubernetes.io/name=github-actions-cache-server
-  kubectl get svc -n arc-systems github-actions-cache-server
-  # Test from runner pod:
-  kubectl exec -it -n arc-runners <runner-pod> -c runner -- curl http://github-actions-cache-server.arc-systems.svc.cluster.local:3000/health
-
-If PVC is full:
-  # Check usage
-  kubectl exec -n arc-systems <cache-server-pod> -- df -h /data
-  # Increase size
-  kubectl edit pvc github-actions-cache-server -n arc-systems
+  kubectl get secret github-arc-secret-eduidec -n arc-runners
 
 For more help:
   Repository: https://github.com/ls1intum/theia-arc-runners
-  Docs: helm-chart/theia-arc-bundle/README.md
-  Cache Server Docs: https://gha-cache-server.falcondev.io

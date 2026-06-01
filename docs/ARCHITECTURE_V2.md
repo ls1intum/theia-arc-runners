@@ -2,7 +2,7 @@
 
 ## Overview
 
-Ephemeral GitHub Actions runners backed by stateful BuildKit workers, a Zot pull-through cache, and a GitHub Actions Cache Server. Runner pods are stateless; BuildKit cache persists on dedicated worker PVCs.
+Ephemeral GitHub Actions runners backed by stateful BuildKit workers and a Zot pull-through cache. Runner pods are stateless; BuildKit cache persists on dedicated worker PVCs.
 
 ## Clusters
 
@@ -29,21 +29,18 @@ This makes all `docker pull` calls route through Zot transparently — workflows
 
 Both clusters reach Zot via NodePort `131.159.88.117:30081`.
 
-### 2. GitHub Actions Cache Server
+### 2. Build cache model
 
-Deployed in `arc-systems` alongside the ARC controller. It is a drop-in replacement for GitHub's hosted cache service, compatible with `actions/cache`. Runners reference it via environment variables injected at the runner pod level:
+The old vendored GitHub Actions Cache Server subchart is no longer deployed by `theia-arc-bundle`. Runner pods use the official `ghcr.io/actions/actions-runner` image, so the chart does not inject `ACTIONS_RESULTS_URL` or `CUSTOM_ACTIONS_RESULTS_URL`.
 
-- `ACTIONS_RESULTS_URL`
-- `CUSTOM_ACTIONS_RESULTS_URL`
-
-Backed by a 200Gi PVC. Cache entries older than 90 days are pruned automatically.
+Docker image pull caching is handled by Zot. Docker build caching is handled by the stateful BuildKit workers.
 
 ### 3. Actions Runner Controller (ARC)
 
-**Mode:** Kubernetes mode with manual DinD sidecar
+**Mode:** custom runner pod template with manual DinD sidecar
 
 **Namespace split** (GitHub security best practice):
-- `arc-systems`: ARC controller, listeners, Cache Server
+- `arc-systems`: ARC controller, listeners
 - `arc-runners`: AutoscalingRunnerSet, ephemeral runner pods
 - `zot-system`: Zot registry
 
@@ -96,7 +93,7 @@ The chart is deployed in **two separate Helm releases** because Helm 3 cannot de
 
 | Release | Namespace | Contains |
 |---------|-----------|----------|
-| `theia-arc-systems` | `arc-systems` | ARC controller, Cache Server |
+| `theia-arc-systems` | `arc-systems` | ARC controller |
 | `theia-arc-runners` | `arc-runners` | AutoscalingRunnerSet only |
 | `theia-zot` | `zot-system` | Zot registry |
 
@@ -108,13 +105,13 @@ The chart is deployed in **two separate Helm releases** because Helm 3 cannot de
 
 | Resource | Namespace | Size | Storage Class |
 |----------|-----------|------|---------------|
-| `github-actions-cache-server` PVC | `arc-systems` | 200Gi | `csi-rbd-sc` (AMD64) / `longhorn` (ARM64) |
 | Zot PVC | `zot-system` | 250Gi | `longhorn` |
+| BuildKit worker PVCs | `buildkit-exp` / `buildkit` | 7 x 500Gi per cluster | `csi-rbd-sc` / `longhorn` |
 
 ## Verification
 
 ```bash
-# ARC controller and cache server
+# ARC controller
 kubectl get pods -n arc-systems
 
 # Runner scale sets
@@ -122,9 +119,6 @@ kubectl get autoscalingrunnersets -n arc-runners
 
 # Active runner pods (scale from 0 when jobs arrive)
 kubectl get pods -n arc-runners
-
-# PVCs
-kubectl get pvc -n arc-systems
 
 # Zot sync activity
 kubectl logs -n zot-system -l app.kubernetes.io/name=zot --tail=50

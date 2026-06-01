@@ -16,18 +16,6 @@ arcRunners:
 arcRunnersArm:
   enabled: false
 
-cache-server:
-  enabled: true
-  config:
-    apiBaseUrl: "http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000"
-  extraEnv:
-    - name: SKIP_TOKEN_VALIDATION
-      value: "true"
-  persistentVolumeClaim:
-    storage: 200Gi
-  nodeSelector:
-    kubernetes.io/arch: arm64
-
 arcRunnersExp:
   enabled: false
 

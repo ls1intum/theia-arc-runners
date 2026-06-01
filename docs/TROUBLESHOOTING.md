@@ -93,7 +93,7 @@ kubectl get pods -n arc-systems | grep listener
 kubectl logs -n arc-systems -l app.kubernetes.io/name=gha-runner-scale-set-controller --tail=50
 
 # Verify secret exists and has required keys
-kubectl get secret github-arc-secret -n arc-runners -o jsonpath='{.data}' | jq 'keys'
+kubectl get secret github-arc-secret-eduidec -n arc-runners -o jsonpath='{.data}' | jq 'keys'
 ```
 
 ### Runner pods not starting (stuck Pending)
@@ -150,38 +150,6 @@ kubectl --context parma delete pod -n zot-system theia-zot-0
 
 ---
 
-## Cache server issues
-
-### `actions/cache` not working / cache misses every run
-
-```bash
-# Verify cache server pod and service
-kubectl get pods -n arc-systems -l app.kubernetes.io/name=github-actions-cache-server
-kubectl get svc -n arc-systems github-actions-cache-server
-
-# Check runner env vars point to cache server
-kubectl get pod -n arc-runners <runner-pod> \
-  -o jsonpath='{.spec.containers[?(@.name=="runner")].env}' | jq '.[] | select(.name | startswith("ACTIONS"))'
-```
-
-### Cache data growing too large
-
-```bash
-# Current PVC usage
-kubectl exec -n arc-systems deploy/github-actions-cache-server -- df -h /data
-
-# Shorten cleanup window (default 90 days)
-helm upgrade theia-arc-systems . \
-  --namespace arc-systems \
-  --set cacheServer.config.cacheCleanupOlderThanDays=30 \
-  --reuse-values
-
-# Or expand the PVC (requires StorageClass that supports expansion)
-kubectl edit pvc github-actions-cache-server -n arc-systems
-```
-
----
-
 ## General debugging commands
 
 ```bash
@@ -192,9 +160,10 @@ kubectl get pods -n arc-systems
 kubectl get autoscalingrunnersets -n arc-runners
 kubectl get pods -n arc-runners
 
-# PVCs (cache server + Zot)
-kubectl get pvc -n arc-systems
+# PVCs (Zot + BuildKit)
 kubectl get pvc -n zot-system
+kubectl get pvc -n buildkit-exp   # theia-prod
+kubectl get pvc -n buildkit       # parma
 
 # Controller logs
 kubectl logs -n arc-systems -l app.kubernetes.io/name=gha-runner-scale-set-controller --tail=100

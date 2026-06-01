@@ -26,7 +26,7 @@ arcRunners:
       serviceAccountName: arc-runner-set-stateless-sa
       initContainers:
         - name: init-dind-externals
-          image: ghcr.io/falcondev-oss/actions-runner:latest
+          image: ghcr.io/actions/actions-runner:latest
           command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
           volumeMounts:
             - name: dind-externals
@@ -51,23 +51,13 @@ arcRunners:
             - name: dind-externals
               mountPath: /home/runner/externals
         - name: runner
-          image: ghcr.io/falcondev-oss/actions-runner:latest
+          image: ghcr.io/actions/actions-runner:latest
           command: ["/home/runner/run.sh"]
           env:
             - name: DOCKER_HOST
               value: unix:///var/run/docker.sock
             - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
               value: "false"
-            - name: ACTIONS_RESULTS_URL
-              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
-            # The falcondev runner reads CUSTOM_ACTIONS_RESULTS_URL from the
-            # system environment and uses it to override the GitHub-provided
-            # ACTIONS_RESULTS_URL before passing it to actions.  Without this,
-            # the runner binary replaces our pod-level ACTIONS_RESULTS_URL with
-            # GitHub's own ResultsServiceUrl, so cache traffic goes to GitHub
-            # instead of our self-hosted cache server.
-            - name: CUSTOM_ACTIONS_RESULTS_URL
-              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
           volumeMounts:
             - name: work
               mountPath: /home/runner/_work
@@ -104,7 +94,7 @@ arcRunnersArm:
       serviceAccountName: arc-runner-set-stateless-arm-sa
       initContainers:
         - name: init-dind-externals
-          image: ghcr.io/falcondev-oss/actions-runner:latest
+          image: ghcr.io/actions/actions-runner:latest
           command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
           volumeMounts:
             - name: dind-externals
@@ -129,17 +119,13 @@ arcRunnersArm:
             - name: dind-externals
               mountPath: /home/runner/externals
         - name: runner
-          image: ghcr.io/falcondev-oss/actions-runner:latest
+          image: ghcr.io/actions/actions-runner:latest
           command: ["/home/runner/run.sh"]
           env:
             - name: DOCKER_HOST
               value: unix:///var/run/docker.sock
             - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
               value: "false"
-            - name: ACTIONS_RESULTS_URL
-              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
-            - name: CUSTOM_ACTIONS_RESULTS_URL
-              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
           volumeMounts:
             - name: work
               mountPath: /home/runner/_work
@@ -183,7 +169,7 @@ arcRunnersExp:
       serviceAccountName: arc-runner-set-stateless-sa
       initContainers:
         - name: init-dind-externals
-          image: ghcr.io/falcondev-oss/actions-runner:latest
+          image: ghcr.io/actions/actions-runner:latest
           command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
           volumeMounts:
             - name: dind-externals
@@ -207,17 +193,13 @@ arcRunnersExp:
             - name: dind-externals
               mountPath: /home/runner/externals
         - name: runner
-          image: ghcr.io/falcondev-oss/actions-runner:latest
+          image: ghcr.io/actions/actions-runner:latest
           command: ["/home/runner/run.sh"]
           env:
             - name: DOCKER_HOST
               value: unix:///var/run/docker.sock
             - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
               value: "false"
-            - name: ACTIONS_RESULTS_URL
-              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
-            - name: CUSTOM_ACTIONS_RESULTS_URL
-              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
             # Injected into every job so workflow steps can compute the correct BuildKit worker
             # address without hard-coding the namespace or replica count.
             - name: BUILDKIT_NAMESPACE
@@ -265,7 +247,7 @@ arcRunnersArmBuildkit:
       serviceAccountName: arc-runner-set-stateless-arm-sa
       initContainers:
         - name: init-dind-externals
-          image: ghcr.io/falcondev-oss/actions-runner:latest
+          image: ghcr.io/actions/actions-runner:latest
           command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
           volumeMounts:
             - name: dind-externals
@@ -289,17 +271,13 @@ arcRunnersArmBuildkit:
             - name: dind-externals
               mountPath: /home/runner/externals
         - name: runner
-          image: ghcr.io/falcondev-oss/actions-runner:latest
+          image: ghcr.io/actions/actions-runner:latest
           command: ["/home/runner/run.sh"]
           env:
             - name: DOCKER_HOST
               value: unix:///var/run/docker.sock
             - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
               value: "false"
-            - name: ACTIONS_RESULTS_URL
-              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
-            - name: CUSTOM_ACTIONS_RESULTS_URL
-              value: http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000/
             - name: BUILDKIT_NAMESPACE
               value: buildkit
             - name: BUILDKIT_NUM_WORKERS
@@ -325,42 +303,6 @@ arcRunnersArmBuildkit:
           emptyDir: {}
         - name: dind-externals
           emptyDir: {}
-
-cache-server:
-  enabled: true
-  replicaCount: 1
-  config:
-    # Must include port — the auto-generated default omits it.
-    apiBaseUrl: "http://theia-arc-systems-cache-server.arc-systems.svc.cluster.local:3000"
-    enableDirectDownloads: false
-    cacheCleanupOlderThanDays: 90
-    storage:
-      driver: filesystem
-      filesystem:
-        path: /data/cache
-    db:
-      driver: sqlite
-      sqlite:
-        path: /data/cache-server.db
-  extraEnv:
-    # Cluster-internal only — no external access, minimal security risk.
-    - name: SKIP_TOKEN_VALIDATION
-      value: "true"
-  persistentVolumeClaim:
-    enabled: true
-    accessModes:
-      - ReadWriteOnce
-    storage: 200Gi
-    storageClassName: longhorn
-  resources:
-    limits:
-      memory: 4Gi
-    requests:
-      cpu: 500m
-      memory: 1Gi
-  nodeSelector:
-    kubernetes.io/arch: amd64
-  tolerations: []
 
 externalSecrets:
   enabled: false
