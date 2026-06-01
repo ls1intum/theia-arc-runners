@@ -26,6 +26,38 @@ ARC RUNNERS (ARM64):
   - GitHub Org: {{ .Values.arcRunnersArm.githubConfigUrl }}
 {{- end }}
 
+{{ if .Values.arcRunnersExp.enabled -}}
+ARC BUILDKIT RUNNERS (AMD64 / EduIDE):
+  - Scale Set: {{ .Values.arcRunnersExp.runnerScaleSetName }}
+  - Min Runners: {{ .Values.arcRunnersExp.minRunners }}
+  - Max Runners: {{ .Values.arcRunnersExp.maxRunners }}
+  - GitHub Org: {{ .Values.arcRunnersExp.githubConfigUrl }}
+{{- end }}
+
+{{ if .Values.arcRunnersLs1intumExp.enabled -}}
+ARC BUILDKIT RUNNERS (AMD64 / ls1intum):
+  - Scale Set: {{ .Values.arcRunnersLs1intumExp.runnerScaleSetName }}
+  - Min Runners: {{ .Values.arcRunnersLs1intumExp.minRunners }}
+  - Max Runners: {{ .Values.arcRunnersLs1intumExp.maxRunners }}
+  - GitHub Org: {{ .Values.arcRunnersLs1intumExp.githubConfigUrl }}
+{{- end }}
+
+{{ if .Values.arcRunnersArmBuildkit.enabled -}}
+ARC BUILDKIT RUNNERS (ARM64 / EduIDE):
+  - Scale Set: {{ .Values.arcRunnersArmBuildkit.runnerScaleSetName }}
+  - Min Runners: {{ .Values.arcRunnersArmBuildkit.minRunners }}
+  - Max Runners: {{ .Values.arcRunnersArmBuildkit.maxRunners }}
+  - GitHub Org: {{ .Values.arcRunnersArmBuildkit.githubConfigUrl }}
+{{- end }}
+
+{{ if .Values.arcRunnersLs1intumArmBuildkit.enabled -}}
+ARC BUILDKIT RUNNERS (ARM64 / ls1intum):
+  - Scale Set: {{ .Values.arcRunnersLs1intumArmBuildkit.runnerScaleSetName }}
+  - Min Runners: {{ .Values.arcRunnersLs1intumArmBuildkit.minRunners }}
+  - Max Runners: {{ .Values.arcRunnersLs1intumArmBuildkit.maxRunners }}
+  - GitHub Org: {{ .Values.arcRunnersLs1intumArmBuildkit.githubConfigUrl }}
+{{- end }}
+
 ========================================
 VERIFICATION COMMANDS
 ========================================
@@ -60,6 +92,7 @@ TROUBLESHOOTING
 If workflows don't trigger runners:
   kubectl logs -n arc-systems -l app.kubernetes.io/name=gha-runner-scale-set-controller
   kubectl get secret github-arc-secret-eduidec -n arc-runners
+  kubectl get secret github-arc-secret -n arc-runners
 
 For more help:
   Repository: https://github.com/ls1intum/theia-arc-runners

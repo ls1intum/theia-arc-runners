@@ -226,6 +226,82 @@ arcRunnersExp:
         - name: dind-externals
           emptyDir: {}
 
+# ls1intum AMD64 BuildKit runner set.
+# Uses the same AMD64 BuildKit worker pool as EduIDE, but registers against a
+# separate GitHub organization and secret.
+arcRunnersLs1intumExp:
+  enabled: true
+  githubConfigUrl: "https://github.com/ls1intum"
+  githubConfigSecret: "github-arc-secret"
+  minRunners: 10
+  maxRunners: 50
+  runnerScaleSetName: "arc-buildkit-ls1intum-amd64"
+  controllerServiceAccount:
+    namespace: arc-systems
+    name: theia-arc-systems-gha-rs-controller
+  buildkit:
+    namespace: buildkit-exp
+    numWorkers: 7
+  template:
+    spec:
+      serviceAccountName: arc-runner-set-stateless-sa
+      initContainers:
+        - name: init-dind-externals
+          image: ghcr.io/actions/actions-runner:latest
+          command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
+          volumeMounts:
+            - name: dind-externals
+              mountPath: /home/runner/tmpDir
+      containers:
+        - name: dind
+          image: docker:dind
+          args:
+            - dockerd
+            - --host=unix:///var/run/docker.sock
+            - --group=1001
+            - --registry-mirror=http://131.159.88.117:30081
+            - --insecure-registry=131.159.88.117:30081
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: work
+              mountPath: /home/runner/_work
+            - name: dind-sock
+              mountPath: /var/run
+            - name: dind-externals
+              mountPath: /home/runner/externals
+        - name: runner
+          image: ghcr.io/actions/actions-runner:latest
+          command: ["/home/runner/run.sh"]
+          env:
+            - name: DOCKER_HOST
+              value: unix:///var/run/docker.sock
+            - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
+              value: "false"
+            - name: BUILDKIT_NAMESPACE
+              value: buildkit-exp
+            - name: BUILDKIT_NUM_WORKERS
+              value: "7"
+          volumeMounts:
+            - name: work
+              mountPath: /home/runner/_work
+            - name: dind-sock
+              mountPath: /var/run
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 4000m
+              memory: 8Gi
+      volumes:
+        - name: work
+          emptyDir: {}
+        - name: dind-sock
+          emptyDir: {}
+        - name: dind-externals
+          emptyDir: {}
+
 # ARM64 BuildKit runner set for parma.
 # Routes docker builds to stateful BuildKit workers in the buildkit namespace.
 # Workflows opt in explicitly with: runs-on: arc-buildkit-eduide-arm64
@@ -236,6 +312,82 @@ arcRunnersArmBuildkit:
   minRunners: 10
   maxRunners: 50
   runnerScaleSetName: "arc-buildkit-eduide-arm64"
+  controllerServiceAccount:
+    namespace: arc-systems
+    name: theia-arc-systems-gha-rs-controller
+  buildkit:
+    namespace: buildkit
+    numWorkers: 7
+  template:
+    spec:
+      serviceAccountName: arc-runner-set-stateless-arm-sa
+      initContainers:
+        - name: init-dind-externals
+          image: ghcr.io/actions/actions-runner:latest
+          command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
+          volumeMounts:
+            - name: dind-externals
+              mountPath: /home/runner/tmpDir
+      containers:
+        - name: dind
+          image: docker:dind
+          args:
+            - dockerd
+            - --host=unix:///var/run/docker.sock
+            - --group=1001
+            - --registry-mirror=http://131.159.88.117:30081
+            - --insecure-registry=131.159.88.117:30081
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: work
+              mountPath: /home/runner/_work
+            - name: dind-sock
+              mountPath: /var/run
+            - name: dind-externals
+              mountPath: /home/runner/externals
+        - name: runner
+          image: ghcr.io/actions/actions-runner:latest
+          command: ["/home/runner/run.sh"]
+          env:
+            - name: DOCKER_HOST
+              value: unix:///var/run/docker.sock
+            - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
+              value: "false"
+            - name: BUILDKIT_NAMESPACE
+              value: buildkit
+            - name: BUILDKIT_NUM_WORKERS
+              value: "7"
+          volumeMounts:
+            - name: work
+              mountPath: /home/runner/_work
+            - name: dind-sock
+              mountPath: /var/run
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 4000m
+              memory: 8Gi
+      volumes:
+        - name: work
+          emptyDir:
+            medium: Memory
+            sizeLimit: 30Gi
+        - name: dind-sock
+          emptyDir: {}
+        - name: dind-externals
+          emptyDir: {}
+
+# ls1intum ARM64 BuildKit runner set for parma.
+arcRunnersLs1intumArmBuildkit:
+  enabled: false
+  githubConfigUrl: "https://github.com/ls1intum"
+  githubConfigSecret: "github-arc-secret"
+  minRunners: 10
+  maxRunners: 50
+  runnerScaleSetName: "arc-buildkit-ls1intum-arm64"
   controllerServiceAccount:
     namespace: arc-systems
     name: theia-arc-systems-gha-rs-controller

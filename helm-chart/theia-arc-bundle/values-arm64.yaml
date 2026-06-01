@@ -19,5 +19,11 @@ arcRunnersArm:
 arcRunnersExp:
   enabled: false
 
+arcRunnersLs1intumExp:
+  enabled: false
+
 arcRunnersArmBuildkit:
+  enabled: true
+
+arcRunnersLs1intumArmBuildkit:
   enabled: true

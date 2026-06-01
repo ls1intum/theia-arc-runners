@@ -6,15 +6,16 @@ Infrastructure-as-code for deploying **GitHub Actions self-hosted runners** usin
 
 BuildKit-focused runner sets backed by stateful BuildKit workers and a shared Zot pull-through cache for Docker Hub.
 
-| Cluster | Architecture | Runner Set | BuildKit Namespace | BuildKit Storage Class | Zot Mirror |
-|---------|--------------|------------|--------------------|------------------------|------------|
-| theia-prod | AMD64 | `arc-buildkit-eduide-amd64` | `buildkit-exp` | `csi-rbd-sc` | `131.159.88.117:30081` |
-| parma | ARM64 | `arc-buildkit-eduide-arm64` | `buildkit` | `longhorn` | `131.159.88.117:30081` |
+| Cluster | Architecture | Runner Sets | BuildKit Namespace | BuildKit Storage Class | Zot Mirror |
+|---------|--------------|-------------|--------------------|------------------------|------------|
+| stud | AMD64 | `arc-buildkit-eduide-stud-amd64`, `arc-buildkit-ls1intum-stud-amd64` | `buildkit-exp` | `csi-rbd-sc` | `131.159.88.117:30081` |
+| theia-prod | AMD64 | `arc-buildkit-eduide-amd64`, `arc-buildkit-ls1intum-amd64` | `buildkit-exp` | `csi-rbd-sc` | `131.159.88.117:30081` |
+| parma | ARM64 | `arc-buildkit-eduide-arm64`, `arc-buildkit-ls1intum-arm64` | `buildkit` | `longhorn` | `131.159.88.117:30081` |
 
 ## Features
 
-- ARC runner sets for EduIDE organization workloads
-- Stateful BuildKit workers (7 replicas per cluster, 500Gi per worker)
+- ARC runner sets for EduIDE and ls1intum organization workloads
+- Stateful BuildKit workers (7 replicas per cluster, 100Gi per worker)
 - Zot pull-through cache for `docker.io` (removes Docker Hub rate-limit pressure)
 - Official ARC runner image (`ghcr.io/actions/actions-runner`) and ARC Helm charts
 - Memory-backed work volume on parma runners (`emptyDir.medium: Memory`, 30Gi)
@@ -50,47 +51,117 @@ See [AGENTS.md](AGENTS.md) for the canonical commands and safety notes.
 
 ### Prerequisites
 
-- `kubectl` configured for target cluster (`theia-prod` / `parma`)
+- `kubectl` configured for target cluster (`stud` / `theia-prod` / `parma`)
 - Helm 3.14+
-- GitHub auth secret in `arc-runners`:
+- GitHub auth secrets in `arc-runners`.
+
+The deploy commands below create the namespaces first. Then create one secret per GitHub organization:
 
 ```bash
-# GitHub App (recommended)
+kubectl create namespace arc-systems --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace arc-runners --dry-run=client -o yaml | kubectl apply -f -
+
+# EduIDE GitHub App (recommended)
 kubectl create secret generic github-arc-secret-eduidec \
   --namespace=arc-runners \
   --from-literal=github_app_id="<APP_ID>" \
   --from-literal=github_app_installation_id="<INSTALLATION_ID>" \
   --from-file=github_app_private_key=<path-to-private-key.pem>
 
-# or PAT
+# ls1intum GitHub App (recommended)
+kubectl create secret generic github-arc-secret \
+  --namespace=arc-runners \
+  --from-literal=github_app_id="<APP_ID>" \
+  --from-literal=github_app_installation_id="<INSTALLATION_ID>" \
+  --from-file=github_app_private_key=<path-to-private-key.pem>
+
+# Or PATs
 kubectl create secret generic github-arc-secret-eduidec \
   --namespace=arc-runners \
   --from-literal=github_token="ghp_xxxxxxxxxxxx"
+
+kubectl create secret generic github-arc-secret \
+  --namespace=arc-runners \
+  --from-literal=github_token="ghp_xxxxxxxxxxxx"
+```
+
+### Deploy stud (AMD64 BuildKit runners)
+
+```bash
+kubectl config use-context stud
+
+# Part 0: BuildKit workers
+kubectl apply -f infra/stud/buildkit-exp/namespace.yaml
+kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/buildkit-exp --timeout=60s
+kubectl apply -f infra/stud/buildkit-exp/configmap.yaml
+kubectl apply -f infra/stud/buildkit-exp/service.yaml
+kubectl apply -f infra/stud/buildkit-exp/statefulset.yaml
+kubectl rollout status statefulset/buildkitd -n buildkit-exp --timeout=10m
+
+# Part 1: Controller
+helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
+  --namespace arc-systems \
+  -f helm-chart/theia-arc-bundle/values-stud.yaml \
+  --set createNamespaces=false \
+  --set arcRunners.enabled=false \
+  --set arcRunnersArm.enabled=false \
+  --set arcRunnersExp.enabled=false \
+  --set arcRunnersArmBuildkit.enabled=false \
+  --set arcRunnersLs1intumExp.enabled=false \
+  --set arcRunnersLs1intumArmBuildkit.enabled=false \
+  --wait --timeout 5m
+
+# Part 2: AMD64 BuildKit runner sets for EduIDE and ls1intum
+helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
+  --namespace arc-runners \
+  -f helm-chart/theia-arc-bundle/values-stud.yaml \
+  --set createNamespaces=false \
+  --set arcController.enabled=false \
+  --set arcRunners.enabled=false \
+  --set arcRunnersArm.enabled=false \
+  --set arcRunnersExp.enabled=true \
+  --set arcRunnersArmBuildkit.enabled=false \
+  --set arcRunnersLs1intumExp.enabled=true \
+  --set arcRunnersLs1intumArmBuildkit.enabled=false \
+  --wait --timeout 10m
 ```
 
 ### Deploy theia-prod (AMD64 BuildKit runners)
 
 ```bash
 kubectl config use-context theia-prod
-cd helm-chart/theia-arc-bundle
+
+# Part 0: BuildKit workers
+kubectl apply -f infra/theia-prod/buildkit-exp/namespace.yaml
+kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/buildkit-exp --timeout=60s
+kubectl apply -f infra/theia-prod/buildkit-exp/configmap.yaml
+kubectl apply -f infra/theia-prod/buildkit-exp/service.yaml
+kubectl apply -f infra/theia-prod/buildkit-exp/statefulset.yaml
+kubectl rollout status statefulset/buildkitd -n buildkit-exp --timeout=10m
 
 # Part 1: Controller
-helm upgrade --install theia-arc-systems . \
-  --namespace arc-systems --create-namespace \
+helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
+  --namespace arc-systems \
+  --set createNamespaces=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
   --set arcRunnersExp.enabled=false \
   --set arcRunnersArmBuildkit.enabled=false \
+  --set arcRunnersLs1intumExp.enabled=false \
+  --set arcRunnersLs1intumArmBuildkit.enabled=false \
   --wait --timeout 5m
 
-# Part 2: AMD64 BuildKit runner set
-helm upgrade --install theia-arc-runners . \
+# Part 2: AMD64 BuildKit runner sets for EduIDE and ls1intum
+helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   --namespace arc-runners \
+  --set createNamespaces=false \
   --set arcController.enabled=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
   --set arcRunnersExp.enabled=true \
   --set arcRunnersArmBuildkit.enabled=false \
+  --set arcRunnersLs1intumExp.enabled=true \
+  --set arcRunnersLs1intumArmBuildkit.enabled=false \
   --wait --timeout 10m
 ```
 
@@ -98,27 +169,40 @@ helm upgrade --install theia-arc-runners . \
 
 ```bash
 kubectl config use-context parma
-cd helm-chart/theia-arc-bundle
+
+# Part 0: BuildKit workers
+kubectl apply -f infra/parma/buildkit/namespace.yaml
+kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/buildkit --timeout=60s
+kubectl apply -f infra/parma/buildkit/configmap.yaml
+kubectl apply -f infra/parma/buildkit/service.yaml
+kubectl apply -f infra/parma/buildkit/statefulset.yaml
+kubectl rollout status statefulset/buildkitd -n buildkit --timeout=10m
 
 # Part 1: Controller
-helm upgrade --install theia-arc-systems . \
-  --namespace arc-systems --create-namespace \
-  -f values-arm64.yaml \
+helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
+  --namespace arc-systems \
+  -f helm-chart/theia-arc-bundle/values-arm64.yaml \
+  --set createNamespaces=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
   --set arcRunnersExp.enabled=false \
   --set arcRunnersArmBuildkit.enabled=false \
+  --set arcRunnersLs1intumExp.enabled=false \
+  --set arcRunnersLs1intumArmBuildkit.enabled=false \
   --wait --timeout 5m
 
-# Part 2: ARM64 BuildKit runner set
-helm upgrade --install theia-arc-runners . \
+# Part 2: ARM64 BuildKit runner sets for EduIDE and ls1intum
+helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   --namespace arc-runners \
-  -f values-arm64.yaml \
+  -f helm-chart/theia-arc-bundle/values-arm64.yaml \
+  --set createNamespaces=false \
   --set arcController.enabled=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
   --set arcRunnersExp.enabled=false \
   --set arcRunnersArmBuildkit.enabled=true \
+  --set arcRunnersLs1intumExp.enabled=false \
+  --set arcRunnersLs1intumArmBuildkit.enabled=true \
   --wait --timeout 10m
 ```
 
@@ -144,14 +228,16 @@ kubectl get autoscalingrunnersets -n arc-runners
 kubectl get pvc -n zot-system
 
 # BuildKit workers
+kubectl --context=stud get pods -n buildkit-exp
 kubectl --context=theia-prod get pods -n buildkit-exp
 kubectl --context=parma get pods -n buildkit
 ```
 
 Expected runner sets:
 
-- `theia-prod`: `arc-buildkit-eduide-amd64`
-- `parma`: `arc-buildkit-eduide-arm64`
+- `stud`: `arc-buildkit-eduide-stud-amd64`, `arc-buildkit-ls1intum-stud-amd64`
+- `theia-prod`: `arc-buildkit-eduide-amd64`, `arc-buildkit-ls1intum-amd64`
+- `parma`: `arc-buildkit-eduide-arm64`, `arc-buildkit-ls1intum-arm64`
 
 ## Documentation
 
@@ -165,5 +251,5 @@ Expected runner sets:
 helm uninstall theia-arc-runners -n arc-runners
 helm uninstall theia-arc-systems -n arc-systems
 helm uninstall theia-zot -n zot-system
-kubectl delete namespace arc-runners arc-systems zot-system
+kubectl delete namespace arc-runners arc-systems zot-system buildkit buildkit-exp --ignore-not-found=true
 ```

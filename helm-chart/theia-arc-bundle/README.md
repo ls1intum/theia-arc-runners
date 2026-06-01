@@ -15,8 +15,12 @@ The previous vendored self-hosted actions cache subchart has been removed. Runne
 
 Active runner scale set labels used in production:
 
+- `arc-buildkit-eduide-stud-amd64` (stud)
+- `arc-buildkit-ls1intum-stud-amd64` (stud)
 - `arc-buildkit-eduide-amd64` (theia-prod)
+- `arc-buildkit-ls1intum-amd64` (theia-prod)
 - `arc-buildkit-eduide-arm64` (parma)
+- `arc-buildkit-ls1intum-arm64` (parma)
 
 ## Why multiple Helm releases?
 
@@ -34,56 +38,99 @@ Helm cannot deploy subcharts to different namespaces in a single release. We dep
 
 1. Kubernetes v1.23+
 2. Helm v3.8+
-3. GitHub App or PAT secret in `arc-runners` (for EduIDE org)
+3. GitHub App or PAT secrets in `arc-runners`:
+   - `github-arc-secret-eduidec` for EduIDE
+   - `github-arc-secret` for ls1intum
 4. Storage classes:
-   - `csi-rbd-sc` on theia-prod
+   - `csi-rbd-sc` on stud/theia-prod
    - `longhorn` on parma
 
 ## Core deployment commands
 
-From `helm-chart/theia-arc-bundle`.
+Run from the repository root.
 
-### theia-prod (AMD64 BuildKit runners)
+### stud (AMD64 BuildKit runners)
 
 ```bash
-helm upgrade --install theia-arc-systems . \
-  --namespace arc-systems --create-namespace \
+helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
+  --namespace arc-systems \
+  -f helm-chart/theia-arc-bundle/values-stud.yaml \
+  --set createNamespaces=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
   --set arcRunnersExp.enabled=false \
   --set arcRunnersArmBuildkit.enabled=false \
+  --set arcRunnersLs1intumExp.enabled=false \
+  --set arcRunnersLs1intumArmBuildkit.enabled=false \
   --wait --timeout 5m
 
-helm upgrade --install theia-arc-runners . \
+helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   --namespace arc-runners \
+  -f helm-chart/theia-arc-bundle/values-stud.yaml \
+  --set createNamespaces=false \
   --set arcController.enabled=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
   --set arcRunnersExp.enabled=true \
   --set arcRunnersArmBuildkit.enabled=false \
+  --set arcRunnersLs1intumExp.enabled=true \
+  --set arcRunnersLs1intumArmBuildkit.enabled=false \
+  --wait --timeout 10m
+```
+
+### theia-prod (AMD64 BuildKit runners)
+
+```bash
+helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
+  --namespace arc-systems \
+  --set createNamespaces=false \
+  --set arcRunners.enabled=false \
+  --set arcRunnersArm.enabled=false \
+  --set arcRunnersExp.enabled=false \
+  --set arcRunnersArmBuildkit.enabled=false \
+  --set arcRunnersLs1intumExp.enabled=false \
+  --set arcRunnersLs1intumArmBuildkit.enabled=false \
+  --wait --timeout 5m
+
+helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
+  --namespace arc-runners \
+  --set createNamespaces=false \
+  --set arcController.enabled=false \
+  --set arcRunners.enabled=false \
+  --set arcRunnersArm.enabled=false \
+  --set arcRunnersExp.enabled=true \
+  --set arcRunnersArmBuildkit.enabled=false \
+  --set arcRunnersLs1intumExp.enabled=true \
+  --set arcRunnersLs1intumArmBuildkit.enabled=false \
   --wait --timeout 10m
 ```
 
 ### parma (ARM64 BuildKit runners)
 
 ```bash
-helm upgrade --install theia-arc-systems . \
-  --namespace arc-systems --create-namespace \
-  -f values-arm64.yaml \
+helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
+  --namespace arc-systems \
+  -f helm-chart/theia-arc-bundle/values-arm64.yaml \
+  --set createNamespaces=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
   --set arcRunnersExp.enabled=false \
   --set arcRunnersArmBuildkit.enabled=false \
+  --set arcRunnersLs1intumExp.enabled=false \
+  --set arcRunnersLs1intumArmBuildkit.enabled=false \
   --wait --timeout 5m
 
-helm upgrade --install theia-arc-runners . \
+helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   --namespace arc-runners \
-  -f values-arm64.yaml \
+  -f helm-chart/theia-arc-bundle/values-arm64.yaml \
+  --set createNamespaces=false \
   --set arcController.enabled=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
   --set arcRunnersExp.enabled=false \
   --set arcRunnersArmBuildkit.enabled=true \
+  --set arcRunnersLs1intumExp.enabled=false \
+  --set arcRunnersLs1intumArmBuildkit.enabled=true \
   --wait --timeout 10m
 ```
 
@@ -96,6 +143,8 @@ helm upgrade --install theia-arc-runners . \
 | `arcRunnersArm.enabled` | Legacy ARM64 stateless set (disabled in current target topology) |
 | `arcRunnersExp.enabled` | AMD64 BuildKit runner set (`arc-buildkit-eduide-amd64`) |
 | `arcRunnersArmBuildkit.enabled` | ARM64 BuildKit runner set (`arc-buildkit-eduide-arm64`) |
+| `arcRunnersLs1intumExp.enabled` | AMD64 BuildKit runner set for ls1intum |
+| `arcRunnersLs1intumArmBuildkit.enabled` | ARM64 BuildKit runner set for ls1intum |
 
 ## Verification
 
@@ -107,6 +156,6 @@ kubectl get pods -n arc-runners
 
 ## Troubleshooting pointers
 
-- If runner sets do not register, verify `github-arc-secret-eduidec` exists in `arc-runners`.
+- If runner sets do not register, verify `github-arc-secret-eduidec` and `github-arc-secret` exist in `arc-runners`.
 - If jobs do not use BuildKit workers, verify runner env vars (`BUILDKIT_NAMESPACE`, `BUILDKIT_NUM_WORKERS`) in generated pods.
 - If image pulls bypass cache, inspect DinD args for mirror endpoint `131.159.88.117:30081`.

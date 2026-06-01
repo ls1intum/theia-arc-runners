@@ -9,10 +9,11 @@ The stack is: Helm 3 umbrella chart + Kubernetes YAML + GitHub Actions workflows
 
 **Two target clusters:**
 
-| Cluster | Context | Arch | Active BuildKit runner set |
+| Cluster | Context | Arch | Active BuildKit runner sets |
 |---------|---------|------|-----------------------------|
-| theia-prod | `theia-prod` | AMD64 | `arc-buildkit-eduide-amd64` |
-| parma | `parma` | ARM64 | `arc-buildkit-eduide-arm64` |
+| stud | `stud` | AMD64 | `arc-buildkit-eduide-stud-amd64`, `arc-buildkit-ls1intum-stud-amd64` |
+| theia-prod | `theia-prod` | AMD64 | `arc-buildkit-eduide-amd64`, `arc-buildkit-ls1intum-amd64` |
+| parma | `parma` | ARM64 | `arc-buildkit-eduide-arm64`, `arc-buildkit-ls1intum-arm64` |
 
 ---
 
@@ -21,50 +22,91 @@ The stack is: Helm 3 umbrella chart + Kubernetes YAML + GitHub Actions workflows
 ### Helm — Deploy Part 1 (Controller)
 
 ```bash
-cd helm-chart/theia-arc-bundle
+kubectl create namespace arc-systems --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace arc-runners --dry-run=client -o yaml | kubectl apply -f -
 
-# AMD64 (theia-prod)
-helm upgrade --install theia-arc-systems . \
-  --namespace arc-systems --create-namespace \
+# AMD64 (stud or theia-prod)
+helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
+  --namespace arc-systems \
+  --set createNamespaces=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
   --set arcRunnersExp.enabled=false \
   --set arcRunnersArmBuildkit.enabled=false \
+  --set arcRunnersLs1intumExp.enabled=false \
+  --set arcRunnersLs1intumArmBuildkit.enabled=false \
   --wait --timeout 5m
 
 # ARM64 (parma) — overlay values-arm64.yaml on top of values.yaml
-helm upgrade --install theia-arc-systems . \
-  --namespace arc-systems --create-namespace \
-  -f values-arm64.yaml \
+helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
+  --namespace arc-systems \
+  -f helm-chart/theia-arc-bundle/values-arm64.yaml \
+  --set createNamespaces=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
   --set arcRunnersExp.enabled=false \
   --set arcRunnersArmBuildkit.enabled=false \
+  --set arcRunnersLs1intumExp.enabled=false \
+  --set arcRunnersLs1intumArmBuildkit.enabled=false \
   --wait --timeout 5m
+```
+
+### Kubernetes — Deploy Part 0 (BuildKit Workers)
+
+```bash
+# stud
+kubectl apply -f infra/stud/buildkit-exp/namespace.yaml
+kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/buildkit-exp --timeout=60s
+kubectl apply -f infra/stud/buildkit-exp/configmap.yaml
+kubectl apply -f infra/stud/buildkit-exp/service.yaml
+kubectl apply -f infra/stud/buildkit-exp/statefulset.yaml
+kubectl rollout status statefulset/buildkitd -n buildkit-exp --timeout=10m
+
+# theia-prod
+kubectl apply -f infra/theia-prod/buildkit-exp/namespace.yaml
+kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/buildkit-exp --timeout=60s
+kubectl apply -f infra/theia-prod/buildkit-exp/configmap.yaml
+kubectl apply -f infra/theia-prod/buildkit-exp/service.yaml
+kubectl apply -f infra/theia-prod/buildkit-exp/statefulset.yaml
+kubectl rollout status statefulset/buildkitd -n buildkit-exp --timeout=10m
+
+# parma
+kubectl apply -f infra/parma/buildkit/namespace.yaml
+kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/buildkit --timeout=60s
+kubectl apply -f infra/parma/buildkit/configmap.yaml
+kubectl apply -f infra/parma/buildkit/service.yaml
+kubectl apply -f infra/parma/buildkit/statefulset.yaml
+kubectl rollout status statefulset/buildkitd -n buildkit --timeout=10m
 ```
 
 ### Helm — Deploy Part 2 (BuildKit Runner Sets)
 
 ```bash
-# AMD64 BuildKit runner set on theia-prod
-helm upgrade --install theia-arc-runners . \
+# AMD64 BuildKit runner sets on stud/theia-prod
+helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   --namespace arc-runners \
+  --set createNamespaces=false \
   --set arcController.enabled=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
   --set arcRunnersExp.enabled=true \
   --set arcRunnersArmBuildkit.enabled=false \
+  --set arcRunnersLs1intumExp.enabled=true \
+  --set arcRunnersLs1intumArmBuildkit.enabled=false \
   --wait --timeout 10m
 
-# ARM64 BuildKit runner set on parma
-helm upgrade --install theia-arc-runners . \
+# ARM64 BuildKit runner sets on parma
+helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   --namespace arc-runners \
-  -f values-arm64.yaml \
+  -f helm-chart/theia-arc-bundle/values-arm64.yaml \
+  --set createNamespaces=false \
   --set arcController.enabled=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
   --set arcRunnersExp.enabled=false \
   --set arcRunnersArmBuildkit.enabled=true \
+  --set arcRunnersLs1intumExp.enabled=false \
+  --set arcRunnersLs1intumArmBuildkit.enabled=true \
   --wait --timeout 10m
 ```
 
@@ -109,7 +151,7 @@ helm template helm-chart/theia-zot/ | kubectl apply --dry-run=client -f -
 helm uninstall theia-arc-runners -n arc-runners
 helm uninstall theia-arc-systems -n arc-systems
 helm uninstall theia-zot -n zot-system
-kubectl delete namespace arc-runners arc-systems zot-system
+kubectl delete namespace arc-runners arc-systems zot-system buildkit buildkit-exp --ignore-not-found=true
 ```
 
 ---
@@ -133,6 +175,7 @@ kubectl delete namespace arc-runners arc-systems zot-system
 │   │       └── gha-runner-scale-set-controller-0.14.2.tgz
 │   └── theia-zot/                 # Standalone Zot Helm wrapper chart
 ├── infra/
+│   ├── stud/buildkit-exp/         # AMD64 BuildKit StatefulSet manifests
 │   ├── theia-prod/buildkit-exp/   # AMD64 BuildKit StatefulSet manifests
 │   └── parma/buildkit/            # ARM64 BuildKit StatefulSet manifests
 └── docs/                          # Operational plans and architecture notes
@@ -144,6 +187,7 @@ kubectl delete namespace arc-runners arc-systems zot-system
 
 Three deployable releases/components are used:
 
+- **Part 0** (`infra/**/buildkit*`): BuildKit workers
 - **Part 1** (`theia-arc-systems`, `arc-systems`): ARC controller
 - **Part 2** (`theia-arc-runners`, `arc-runners`): BuildKit-focused AutoscalingRunnerSet(s)
 - **Part 3** (`theia-zot`, `zot-system`): Zot pull-through registry on parma
@@ -154,7 +198,7 @@ Three deployable releases/components are used:
 
 **Build execution:** GitHub jobs run on ARC runners with DinD + runner containers. Docker builds are routed by workflow logic to stateful BuildKit workers:
 
-- theia-prod workers: namespace `buildkit-exp` (`csi-rbd-sc`, 7 replicas)
+- stud/theia-prod workers: namespace `buildkit-exp` (`csi-rbd-sc`, 7 replicas)
 - parma workers: namespace `buildkit` (`longhorn`, 7 replicas)
 
 ---
@@ -167,10 +211,12 @@ Three deployable releases/components are used:
   - `theia-zot` (Part 3)
 - Namespaces:
   - `arc-systems`, `arc-runners`, `zot-system`
-  - `buildkit-exp` (theia-prod BuildKit), `buildkit` (parma BuildKit)
+  - `buildkit-exp` (stud/theia-prod BuildKit), `buildkit` (parma BuildKit)
 - Active runner set names:
   - `arc-buildkit-eduide-amd64`
   - `arc-buildkit-eduide-arm64`
+  - `arc-buildkit-ls1intum-amd64`
+  - `arc-buildkit-ls1intum-arm64`
 
 ---
 

@@ -33,17 +33,30 @@ dependencies:
     alias: arcRunnersArm
     condition: arcRunnersArm.enabled
 
-  # Experimental ARC Runner Scale Set — routes docker builds to stateful BuildKit workers.
-  # Disabled by default; enable only after deploying infra/theia-prod/buildkit-exp/ manifests.
+  # EduIDE AMD64 BuildKit runner set.
   - name: gha-runner-scale-set
     version: 0.14.2
     repository: "oci://ghcr.io/actions/actions-runner-controller-charts"
     alias: arcRunnersExp
     condition: arcRunnersExp.enabled
 
-  # ARM64 BuildKit ARC Runner Scale Set — routes docker builds to stateful BuildKit workers on parma.
+  # EduIDE ARM64 BuildKit runner set.
   - name: gha-runner-scale-set
     version: 0.14.2
     repository: "oci://ghcr.io/actions/actions-runner-controller-charts"
     alias: arcRunnersArmBuildkit
     condition: arcRunnersArmBuildkit.enabled
+
+  # ls1intum AMD64 BuildKit runner set.
+  - name: gha-runner-scale-set
+    version: 0.14.2
+    repository: "oci://ghcr.io/actions/actions-runner-controller-charts"
+    alias: arcRunnersLs1intumExp
+    condition: arcRunnersLs1intumExp.enabled
+
+  # ls1intum ARM64 BuildKit runner set.
+  - name: gha-runner-scale-set
+    version: 0.14.2
+    repository: "oci://ghcr.io/actions/actions-runner-controller-charts"
+    alias: arcRunnersLs1intumArmBuildkit
+    condition: arcRunnersLs1intumArmBuildkit.enabled

@@ -11,7 +11,7 @@ on:
   workflow_call:
     inputs:
       cluster:
-        description: "Target cluster: theia-prod or parma"
+        description: "Target cluster: stud, theia-prod, or parma"
         required: true
         type: string
       component:
@@ -41,12 +41,20 @@ jobs:
 
       - name: Setup kubeconfig
         env:
+          KUBECONFIG_STUD: ${{ secrets.KUBECONFIG_STUD }}
           KUBECONFIG_THEIA_PROD: ${{ secrets.KUBECONFIG_THEIA_PROD }}
           KUBECONFIG_PARMA: ${{ secrets.KUBECONFIG_PARMA }}
         run: |
           set -euo pipefail
 
           case "${{ inputs.cluster }}" in
+            stud)
+              if [[ -z "${KUBECONFIG_STUD}" ]]; then
+                echo "::error::Missing KUBECONFIG_STUD secret."
+                exit 1
+              fi
+              printf '%s' "${KUBECONFIG_STUD}" > kubeconfig
+              ;;
             theia-prod)
               if [[ -z "${KUBECONFIG_THEIA_PROD}" ]]; then
                 echo "::error::Missing KUBECONFIG_THEIA_PROD secret."
@@ -62,7 +70,7 @@ jobs:
               printf '%s' "${KUBECONFIG_PARMA}" > kubeconfig
               ;;
             *)
-              echo "::error::Unsupported cluster '${{ inputs.cluster }}'. Use 'theia-prod' or 'parma'."
+              echo "::error::Unsupported cluster '${{ inputs.cluster }}'. Use 'stud', 'theia-prod', or 'parma'."
               exit 1
               ;;
           esac
@@ -81,16 +89,23 @@ jobs:
           set -euo pipefail
 
           case "${{ inputs.cluster }}" in
+            stud)
+              echo "buildkit_path=infra/stud/buildkit-exp" >> "${GITHUB_OUTPUT}"
+              echo "helm_values=helm-chart/theia-arc-bundle/values.yaml -f helm-chart/theia-arc-bundle/values-stud.yaml" >> "${GITHUB_OUTPUT}"
+              echo "buildkit_namespace=buildkit-exp" >> "${GITHUB_OUTPUT}"
+              ;;
             theia-prod)
               echo "buildkit_path=infra/theia-prod/buildkit-exp" >> "${GITHUB_OUTPUT}"
               echo "helm_values=helm-chart/theia-arc-bundle/values.yaml" >> "${GITHUB_OUTPUT}"
+              echo "buildkit_namespace=buildkit-exp" >> "${GITHUB_OUTPUT}"
               ;;
             parma)
               echo "buildkit_path=infra/parma/buildkit" >> "${GITHUB_OUTPUT}"
               echo "helm_values=helm-chart/theia-arc-bundle/values.yaml -f helm-chart/theia-arc-bundle/values-arm64.yaml" >> "${GITHUB_OUTPUT}"
+              echo "buildkit_namespace=buildkit" >> "${GITHUB_OUTPUT}"
               ;;
             *)
-              echo "::error::Unsupported cluster '${{ inputs.cluster }}'. Use 'theia-prod' or 'parma'."
+              echo "::error::Unsupported cluster '${{ inputs.cluster }}'. Use 'stud', 'theia-prod', or 'parma'."
               exit 1
               ;;
           esac
@@ -114,11 +129,12 @@ jobs:
 
           echo "Applying BuildKit manifests from ${BUILDKIT_PATH}"
           kubectl apply -f "${BUILDKIT_PATH}/namespace.yaml"
+          namespace="$(awk '/namespace:/ {print $2; exit}' "${BUILDKIT_PATH}/statefulset.yaml")"
+          kubectl wait --for=jsonpath='{.status.phase}'=Active "namespace/${namespace}" --timeout=60s
           kubectl apply -f "${BUILDKIT_PATH}/configmap.yaml"
           kubectl apply -f "${BUILDKIT_PATH}/service.yaml"
           kubectl apply -f "${BUILDKIT_PATH}/statefulset.yaml"
 
-          namespace="$(awk '/namespace:/ {print $2; exit}' "${BUILDKIT_PATH}/statefulset.yaml")"
           kubectl rollout status statefulset/buildkitd -n "${namespace}" --timeout=10m
           kubectl get statefulset,pods,pvc,svc -n "${namespace}" -l app.kubernetes.io/name=buildkitd
 
@@ -127,30 +143,90 @@ jobs:
         env:
           KUBECONFIG: ${{ github.workspace }}/kubeconfig
           HELM_VALUES: ${{ steps.target.outputs.helm_values }}
+          EDUIDEC_GITHUB_TOKEN: ${{ secrets.EDUIDEC_GITHUB_TOKEN }}
+          EDUIDEC_GITHUB_APP_ID: ${{ secrets.EDUIDEC_GITHUB_APP_ID }}
+          EDUIDEC_GITHUB_APP_INSTALLATION_ID: ${{ secrets.EDUIDEC_GITHUB_APP_INSTALLATION_ID }}
+          EDUIDEC_GITHUB_APP_PRIVATE_KEY: ${{ secrets.EDUIDEC_GITHUB_APP_PRIVATE_KEY }}
+          LS1INTUM_GITHUB_TOKEN: ${{ secrets.LS1INTUM_GITHUB_TOKEN }}
+          LS1INTUM_GITHUB_APP_ID: ${{ secrets.LS1INTUM_GITHUB_APP_ID }}
+          LS1INTUM_GITHUB_APP_INSTALLATION_ID: ${{ secrets.LS1INTUM_GITHUB_APP_INSTALLATION_ID }}
+          LS1INTUM_GITHUB_APP_PRIVATE_KEY: ${{ secrets.LS1INTUM_GITHUB_APP_PRIVATE_KEY }}
         run: |
           set -euo pipefail
 
           helm dependency build helm-chart/theia-arc-bundle
+
+          kubectl create namespace arc-systems --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create namespace arc-runners --dry-run=client -o yaml | kubectl apply -f -
+
+          create_github_secret() {
+            local name="$1"
+            local token="$2"
+            local app_id="$3"
+            local installation_id="$4"
+            local private_key="$5"
+
+            if [[ -n "${token}" ]]; then
+              kubectl create secret generic "${name}" \
+                --namespace arc-runners \
+                --from-literal=github_token="${token}" \
+                --dry-run=client -o yaml | kubectl apply -f -
+              return
+            fi
+
+            if [[ -n "${app_id}" && -n "${installation_id}" && -n "${private_key}" ]]; then
+              local key_file
+              key_file="$(mktemp)"
+              printf '%s' "${private_key}" > "${key_file}"
+              kubectl create secret generic "${name}" \
+                --namespace arc-runners \
+                --from-literal=github_app_id="${app_id}" \
+                --from-literal=github_app_installation_id="${installation_id}" \
+                --from-file=github_app_private_key="${key_file}" \
+                --dry-run=client -o yaml | kubectl apply -f -
+              rm -f "${key_file}"
+              return
+            fi
+
+            echo "::error::Missing credentials for Kubernetes secret ${name}. Provide either *_GITHUB_TOKEN or all GitHub App secrets."
+            exit 1
+          }
+
+          create_github_secret \
+            github-arc-secret-eduidec \
+            "${EDUIDEC_GITHUB_TOKEN}" \
+            "${EDUIDEC_GITHUB_APP_ID}" \
+            "${EDUIDEC_GITHUB_APP_INSTALLATION_ID}" \
+            "${EDUIDEC_GITHUB_APP_PRIVATE_KEY}"
+
+          create_github_secret \
+            github-arc-secret \
+            "${LS1INTUM_GITHUB_TOKEN}" \
+            "${LS1INTUM_GITHUB_APP_ID}" \
+            "${LS1INTUM_GITHUB_APP_INSTALLATION_ID}" \
+            "${LS1INTUM_GITHUB_APP_PRIVATE_KEY}"
 
           # HELM_VALUES intentionally contains one or two -f arguments selected
           # from the fixed cluster allowlist above.
           helm upgrade --install theia-arc-systems \
             helm-chart/theia-arc-bundle \
             --namespace arc-systems \
-            --create-namespace \
             -f ${HELM_VALUES} \
+            --set createNamespaces=false \
             --set arcController.enabled=true \
             --set arcRunners.enabled=false \
             --set arcRunnersArm.enabled=false \
             --set arcRunnersExp.enabled=false \
             --set arcRunnersArmBuildkit.enabled=false \
+            --set arcRunnersLs1intumExp.enabled=false \
+            --set arcRunnersLs1intumArmBuildkit.enabled=false \
             --wait
 
           helm upgrade --install theia-arc-runners \
             helm-chart/theia-arc-bundle \
             --namespace arc-runners \
-            --create-namespace \
             -f ${HELM_VALUES} \
+            --set createNamespaces=false \
             --set arcController.enabled=false \
             --wait
 
@@ -168,8 +244,4 @@ jobs:
           kubectl get autoscalingrunnersets,pods -n arc-runners -o wide || true
           echo ""
           echo "BuildKit workers:"
-          if [[ "${{ inputs.cluster }}" == "theia-prod" ]]; then
-            kubectl get statefulset,pods,pvc,svc -n buildkit-exp -o wide || true
-          else
-            kubectl get statefulset,pods,pvc,svc -n buildkit -o wide || true
-          fi
+          kubectl get statefulset,pods,pvc,svc -n "${{ steps.target.outputs.buildkit_namespace }}" -o wide || true

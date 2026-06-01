@@ -1,0 +1,30 @@
+# AMD64-specific overrides for the stud cluster.
+# stud runs in parallel to theia-prod during migration, so runner scale set
+# names must be distinct to avoid GitHub ARC listener session conflicts.
+
+global:
+  storageClass: "csi-rbd-sc"
+  nodeSelector:
+    kubernetes.io/arch: amd64
+
+createNamespaces: false
+
+arcRunners:
+  enabled: false
+
+arcRunnersArm:
+  enabled: false
+
+arcRunnersExp:
+  enabled: true
+  runnerScaleSetName: "arc-buildkit-eduide-stud-amd64"
+
+arcRunnersLs1intumExp:
+  enabled: true
+  runnerScaleSetName: "arc-buildkit-ls1intum-stud-amd64"
+
+arcRunnersArmBuildkit:
+  enabled: false
+
+arcRunnersLs1intumArmBuildkit:
+  enabled: false
