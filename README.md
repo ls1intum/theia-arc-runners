@@ -4,7 +4,7 @@ Infrastructure-as-code for deploying **GitHub Actions self-hosted runners** usin
 
 ## Architecture
 
-BuildKit-focused runner sets backed by stateful BuildKit workers and a shared Zot pull-through cache for Docker Hub.
+BuildKit-focused runner sets backed by stateful BuildKit workers, a shared Zot pull-through cache (Docker Hub), and a GitHub Actions Cache Server.
 
 | Cluster | Architecture | Runner Set | BuildKit Namespace | BuildKit Storage Class | Zot Mirror |
 |---------|--------------|------------|--------------------|------------------------|------------|
@@ -16,7 +16,7 @@ BuildKit-focused runner sets backed by stateful BuildKit workers and a shared Zo
 - ARC runner sets for EduIDE organization workloads
 - Stateful BuildKit workers (7 replicas per cluster, 500Gi per worker)
 - Zot pull-through cache for `docker.io` (removes Docker Hub rate-limit pressure)
-- Official ARC runner image (`ghcr.io/actions/actions-runner`) and ARC Helm charts
+- GitHub Actions Cache Server for `actions/cache` compatibility (200Gi PVC)
 - Memory-backed work volume on parma runners (`emptyDir.medium: Memory`, 30Gi)
 
 ## Components
@@ -36,6 +36,15 @@ Runner DinD containers are configured with:
 --registry-mirror=http://131.159.88.117:30081
 --insecure-registry=131.159.88.117:30081
 ```
+
+### GitHub Actions Cache Server
+
+Deployed in `arc-systems`. Runners use:
+
+- `ACTIONS_RESULTS_URL`
+- `CUSTOM_ACTIONS_RESULTS_URL`
+
+Backed by a 200Gi PVC with cleanup policy.
 
 ### Runner + BuildKit Model
 
@@ -74,7 +83,7 @@ kubectl create secret generic github-arc-secret-eduidec \
 kubectl config use-context theia-prod
 cd helm-chart/theia-arc-bundle
 
-# Part 1: Controller
+# Part 1: Controller + Cache Server
 helm upgrade --install theia-arc-systems . \
   --namespace arc-systems --create-namespace \
   --set arcRunners.enabled=false \
@@ -86,6 +95,7 @@ helm upgrade --install theia-arc-systems . \
 # Part 2: AMD64 BuildKit runner set
 helm upgrade --install theia-arc-runners . \
   --namespace arc-runners \
+  --set cache-server.enabled=false \
   --set arcController.enabled=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
@@ -100,7 +110,7 @@ helm upgrade --install theia-arc-runners . \
 kubectl config use-context parma
 cd helm-chart/theia-arc-bundle
 
-# Part 1: Controller
+# Part 1: Controller + Cache Server
 helm upgrade --install theia-arc-systems . \
   --namespace arc-systems --create-namespace \
   -f values-arm64.yaml \
@@ -114,6 +124,7 @@ helm upgrade --install theia-arc-systems . \
 helm upgrade --install theia-arc-runners . \
   --namespace arc-runners \
   -f values-arm64.yaml \
+  --set cache-server.enabled=false \
   --set arcController.enabled=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
@@ -141,6 +152,7 @@ helm upgrade --install theia-zot . \
 kubectl get pods -n arc-systems
 kubectl get pods -n arc-runners
 kubectl get autoscalingrunnersets -n arc-runners
+kubectl get pvc -n arc-systems
 kubectl get pvc -n zot-system
 
 # BuildKit workers

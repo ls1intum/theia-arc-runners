@@ -18,7 +18,7 @@ The stack is: Helm 3 umbrella chart + Kubernetes YAML + GitHub Actions workflows
 
 ## Deployment Commands
 
-### Helm — Deploy Part 1 (Controller)
+### Helm — Deploy Part 1 (Controller + Cache Server)
 
 ```bash
 cd helm-chart/theia-arc-bundle
@@ -49,6 +49,7 @@ helm upgrade --install theia-arc-systems . \
 # AMD64 BuildKit runner set on theia-prod
 helm upgrade --install theia-arc-runners . \
   --namespace arc-runners \
+  --set cache-server.enabled=false \
   --set arcController.enabled=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
@@ -60,6 +61,7 @@ helm upgrade --install theia-arc-runners . \
 helm upgrade --install theia-arc-runners . \
   --namespace arc-runners \
   -f values-arm64.yaml \
+  --set cache-server.enabled=false \
   --set arcController.enabled=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
@@ -86,6 +88,7 @@ helm upgrade --install theia-zot . \
 kubectl get pods -n arc-systems
 kubectl get pods -n arc-runners
 kubectl get autoscalingrunnersets -n arc-runners
+kubectl get pvc -n arc-systems
 kubectl get pvc -n zot-system
 
 # BuildKit workers
@@ -119,7 +122,7 @@ kubectl delete namespace arc-runners arc-systems zot-system
 ```
 .
 ├── helm-chart/
-│   ├── theia-arc-bundle/          # Umbrella Helm chart (controller/runner sets)
+│   ├── theia-arc-bundle/          # Umbrella Helm chart (controller/cache/runner sets)
 │   │   ├── Chart.yaml             # Chart metadata + dependencies
 │   │   ├── values.yaml            # AMD64 defaults (theia-prod)
 │   │   ├── values-arm64.yaml      # ARM64 overrides (parma)
@@ -129,8 +132,9 @@ kubectl delete namespace arc-runners arc-systems zot-system
 │   │   │   ├── rbac.yaml          # ServiceAccounts + Role + RoleBindings
 │   │   │   └── external-secret-github.yaml  # Optional: ExternalSecrets integration
 │   │   └── charts/
-│   │       ├── gha-runner-scale-set-0.14.2.tgz
-│   │       └── gha-runner-scale-set-controller-0.14.2.tgz
+│   │       ├── gha-runner-scale-set-0.9.3.tgz
+│   │       ├── gha-runner-scale-set-controller-0.9.3.tgz
+│   │       └── github-actions-cache-server/   # Local subchart (vendored)
 │   └── theia-zot/                 # Standalone Zot Helm wrapper chart
 ├── infra/
 │   ├── theia-prod/buildkit-exp/   # AMD64 BuildKit StatefulSet manifests
@@ -144,7 +148,7 @@ kubectl delete namespace arc-runners arc-systems zot-system
 
 Three deployable releases/components are used:
 
-- **Part 1** (`theia-arc-systems`, `arc-systems`): ARC controller
+- **Part 1** (`theia-arc-systems`, `arc-systems`): ARC controller + GitHub Actions Cache Server
 - **Part 2** (`theia-arc-runners`, `arc-runners`): BuildKit-focused AutoscalingRunnerSet(s)
 - **Part 3** (`theia-zot`, `zot-system`): Zot pull-through registry on parma
 
@@ -179,7 +183,5 @@ Three deployable releases/components are used:
 - **Uninstall order is critical**: remove runners before controller to avoid ARC finalizer deadlocks.
 - `createNamespaces: false` on parma is intentional to avoid Helm SSA ownership conflicts for `arc-runners`.
 - `externalSecrets.enabled: false` by default; auth secrets are managed explicitly.
-- The old vendored GitHub Actions Cache Server subchart has been removed; do not use `cache-server.enabled`.
-- Runner pods use the official `ghcr.io/actions/actions-runner:latest` image.
 - Keep docs aligned with manifests; when mismatched, trust `values.yaml`, `values-arm64.yaml`, and `infra/**` YAML.
 - Zot startup can fail on low inotify settings (`failed to create a new hot reloader`); raise node inotify limits and restart pod.
