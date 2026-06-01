@@ -70,7 +70,6 @@ helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   --namespace arc-runners --kube-context parma \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-arm64.yaml \
-  --set cache-server.enabled=false \
   --set arcController.enabled=false \
   --set arcRunnersArm.enabled=false \
   --set arcRunnersArmBuildkit.enabled=true \

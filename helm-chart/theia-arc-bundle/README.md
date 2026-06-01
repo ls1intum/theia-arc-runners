@@ -1,6 +1,6 @@
 # Theia ARC Bundle Helm Chart
 
-Umbrella chart for ARC controller, ARC runner scale sets, and GitHub Actions Cache Server.
+Umbrella chart for the ARC controller and ARC runner scale sets.
 
 > Zot is **not** deployed by this chart. Zot is deployed via `helm-chart/theia-zot` as a separate release.
 
@@ -10,7 +10,8 @@ This chart provides:
 
 - ARC controller (`gha-runner-scale-set-controller`)
 - ARC runner scale sets (`gha-runner-scale-set` aliases)
-- GitHub Actions Cache Server (vendored local subchart)
+
+The previous vendored self-hosted actions cache subchart has been removed. Runner pods now use the official GitHub runner image; Docker image caching is handled by Zot and build caching is handled by the stateful BuildKit workers.
 
 Active runner scale set labels used in production:
 
@@ -23,7 +24,7 @@ Helm cannot deploy subcharts to different namespaces in a single release. We dep
 
 | Part | Release | Namespace | Includes |
 |------|---------|-----------|----------|
-| Part 1 | `theia-arc-systems` | `arc-systems` | ARC controller + cache server |
+| Part 1 | `theia-arc-systems` | `arc-systems` | ARC controller |
 | Part 2 | `theia-arc-runners` | `arc-runners` | Runner scale set(s) |
 | Part 3 | `theia-zot` (different chart) | `zot-system` | Zot pull-through cache |
 
@@ -55,7 +56,6 @@ helm upgrade --install theia-arc-systems . \
 
 helm upgrade --install theia-arc-runners . \
   --namespace arc-runners \
-  --set cache-server.enabled=false \
   --set arcController.enabled=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
@@ -79,7 +79,6 @@ helm upgrade --install theia-arc-systems . \
 helm upgrade --install theia-arc-runners . \
   --namespace arc-runners \
   -f values-arm64.yaml \
-  --set cache-server.enabled=false \
   --set arcController.enabled=false \
   --set arcRunners.enabled=false \
   --set arcRunnersArm.enabled=false \
@@ -93,7 +92,6 @@ helm upgrade --install theia-arc-runners . \
 | Value | Meaning |
 |------|---------|
 | `arcController.enabled` | Enable ARC controller subchart |
-| `cache-server.enabled` | Enable cache server subchart |
 | `arcRunners.enabled` | Legacy AMD64 stateless set (disabled in current target topology) |
 | `arcRunnersArm.enabled` | Legacy ARM64 stateless set (disabled in current target topology) |
 | `arcRunnersExp.enabled` | AMD64 BuildKit runner set (`arc-buildkit-eduide-amd64`) |
@@ -105,7 +103,6 @@ helm upgrade --install theia-arc-runners . \
 kubectl get pods -n arc-systems
 kubectl get autoscalingrunnersets -n arc-runners
 kubectl get pods -n arc-runners
-kubectl get pvc -n arc-systems
 ```
 
 ## Troubleshooting pointers
