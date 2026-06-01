@@ -90,5 +90,5 @@ spec:
         storageClassName: csi-rbd-sc
         resources:
           requests:
-            # 500 Gi per worker.
-            storage: 500Gi
+            # 100 Gi per worker.
+            storage: 100Gi
