@@ -81,6 +81,9 @@ kubectl create namespace arc-runners --dry-run=client -o yaml | kubectl apply -f
 
 Assign each runtime namespace to the matching Rancher project after that namespace exists:
 
+Cluster -> Projects/Namespaces -> Create Project
+Cluster -> Projects/Namespaces -> Click the ... on the right side of the Namespace -> Move
+
 | Cluster | Rancher project | Namespaces |
 |---------|-----------------|------------|
 | `stud` | `ARC Runners Stud` | `arc-systems`, `arc-runners`, `buildkit` |
