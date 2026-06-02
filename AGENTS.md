@@ -268,6 +268,8 @@ Three deployable releases/components are used:
 
 **Registry caching:** Zot is centralized on parma and consumed by all runner clusters via NodePort `131.159.88.117:30081`.
 
+Zot mainly mitigates Docker Hub pull rate limits. If Docker Hub traffic grows substantially, revisit the architecture decision in `docs/ARCHITECTURE_V2.md`: a paid Docker Hub account injected into the stateful BuildKit workers may be less maintenance than operating Zot.
+
 **Build execution:** GitHub jobs run on ARC runners with DinD + runner containers. Docker builds are routed by workflow logic to stateful BuildKit workers:
 
 - stud/theia-prod workers: namespace `buildkit` (`csi-rbd-sc`, currently 7 replicas)
