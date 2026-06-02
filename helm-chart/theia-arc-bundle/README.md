@@ -13,6 +13,8 @@ This chart provides:
 
 The previous vendored self-hosted actions cache subchart has been removed. Runner pods now use the official GitHub runner image; Docker image caching is handled by Zot and build caching is handled by the stateful BuildKit workers.
 
+BuildKit workers run as separate StatefulSet pods so runner pods stay disposable while Docker layer cache, BuildKit cache layers, and BuildKit cache mounts persist across workflow runs.
+
 Active runner scale set labels used in production:
 
 - `arc-buildkit-eduide-stud-amd64` (stud)
@@ -57,8 +59,6 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-stud.yaml \
   --set createNamespaces=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -71,8 +71,6 @@ helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values-stud.yaml \
   --set createNamespaces=false \
   --set ghaArcController.enabled=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=true \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=true \
@@ -88,8 +86,6 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-theia-prod.yaml \
   --set createNamespaces=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -102,8 +98,6 @@ helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values-theia-prod.yaml \
   --set createNamespaces=false \
   --set ghaArcController.enabled=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=true \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=true \
@@ -119,8 +113,6 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-parma.yaml \
   --set createNamespaces=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -133,8 +125,6 @@ helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values-parma.yaml \
   --set createNamespaces=false \
   --set ghaArcController.enabled=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=true \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -156,8 +146,6 @@ Use `values.yaml` plus exactly one cluster overlay:
 | Value | Meaning |
 |------|---------|
 | `ghaArcController.enabled` | Enable ARC controller subchart |
-| `ghaArcScaleSetStatelessAmdEduide.enabled` | Legacy AMD64 stateless set (disabled in current target topology) |
-| `ghaArcScaleSetStatelessArmEduide.enabled` | Legacy ARM64 stateless set (disabled in current target topology) |
 | `ghaArcScaleSetAmdEduide.enabled` | AMD64 BuildKit runner set (`arc-buildkit-eduide-amd64`) |
 | `ghaArcScaleSetArmEduide.enabled` | ARM64 BuildKit runner set (`arc-buildkit-eduide-arm64`) |
 | `ghaArcScaleSetAmdLs1intum.enabled` | AMD64 BuildKit runner set for ls1intum |

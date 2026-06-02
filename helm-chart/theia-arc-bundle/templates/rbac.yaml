@@ -1,8 +1,8 @@
-{{- if or .Values.ghaArcScaleSetStatelessAmdEduide.enabled .Values.ghaArcScaleSetStatelessArmEduide.enabled .Values.ghaArcScaleSetAmdEduide.enabled .Values.ghaArcScaleSetArmEduide.enabled .Values.ghaArcScaleSetAmdLs1intum.enabled .Values.ghaArcScaleSetArmLs1intum.enabled }}
+{{- if or .Values.ghaArcScaleSetAmdEduide.enabled .Values.ghaArcScaleSetArmEduide.enabled .Values.ghaArcScaleSetAmdLs1intum.enabled .Values.ghaArcScaleSetArmLs1intum.enabled }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: arc-runner-set-stateless-sa
+  name: arc-runner-set-amd-sa
   namespace: arc-runners
   labels:
     {{- include "theia-arc-bundle.labels" . | nindent 4 }}
@@ -10,7 +10,7 @@ metadata:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: arc-runner-set-stateless-arm-sa
+  name: arc-runner-set-arm-sa
   namespace: arc-runners
   labels:
     {{- include "theia-arc-bundle.labels" . | nindent 4 }}
@@ -42,13 +42,13 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: arc-runner-set-stateless-rb
+  name: arc-runner-set-amd-rb
   namespace: arc-runners
   labels:
     {{- include "theia-arc-bundle.labels" . | nindent 4 }}
 subjects:
   - kind: ServiceAccount
-    name: arc-runner-set-stateless-sa
+    name: arc-runner-set-amd-sa
     namespace: arc-runners
 roleRef:
   kind: Role
@@ -58,13 +58,13 @@ roleRef:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: arc-runner-set-stateless-arm-rb
+  name: arc-runner-set-arm-rb
   namespace: arc-runners
   labels:
     {{- include "theia-arc-bundle.labels" . | nindent 4 }}
 subjects:
   - kind: ServiceAccount
-    name: arc-runner-set-stateless-arm-sa
+    name: arc-runner-set-arm-sa
     namespace: arc-runners
 roleRef:
   kind: Role

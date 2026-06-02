@@ -11,11 +11,6 @@ global:
 
 createNamespaces: false
 
-ghaArcScaleSetStatelessAmdEduide:
-  enabled: false
-
-ghaArcScaleSetStatelessArmEduide:
-  enabled: false
 
 ghaArcScaleSetAmdEduide:
   enabled: true

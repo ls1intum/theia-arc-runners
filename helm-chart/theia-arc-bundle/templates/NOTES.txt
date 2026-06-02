@@ -22,28 +22,6 @@ ARC CONTROLLER:
   - Status: kubectl get pods -n arc-systems
 {{- end }}
 
-{{ if .Values.ghaArcScaleSetStatelessAmdEduide.enabled -}}
-ARC RUNNERS (AMD64):
-  - Component: scale set
-  - Architecture: AMD64
-  - GitHub Org: EduIDE
-  - Scale Set: {{ .Values.ghaArcScaleSetStatelessAmdEduide.runnerScaleSetName }}
-  - Min Runners: {{ .Values.ghaArcScaleSetStatelessAmdEduide.minRunners }}
-  - Max Runners: {{ .Values.ghaArcScaleSetStatelessAmdEduide.maxRunners }}
-  - GitHub Config URL: {{ .Values.ghaArcScaleSetStatelessAmdEduide.githubConfigUrl }}
-{{- end }}
-
-{{ if .Values.ghaArcScaleSetStatelessArmEduide.enabled -}}
-ARC RUNNERS (ARM64):
-  - Component: scale set
-  - Architecture: ARM64
-  - GitHub Org: EduIDE
-  - Scale Set: {{ .Values.ghaArcScaleSetStatelessArmEduide.runnerScaleSetName }}
-  - Min Runners: {{ .Values.ghaArcScaleSetStatelessArmEduide.minRunners }}
-  - Max Runners: {{ .Values.ghaArcScaleSetStatelessArmEduide.maxRunners }}
-  - GitHub Config URL: {{ .Values.ghaArcScaleSetStatelessArmEduide.githubConfigUrl }}
-{{- end }}
-
 {{ if .Values.ghaArcScaleSetAmdEduide.enabled -}}
 ARC BUILDKIT RUNNERS (AMD64 / EduIDE):
   - Component: scale set

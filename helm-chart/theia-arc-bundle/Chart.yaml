@@ -19,20 +19,6 @@ dependencies:
     alias: ghaArcController
     condition: ghaArcController.enabled
 
-  # ARC scale set: stateless AMD64 runner set for EduIDE. Disabled in the current BuildKit topology.
-  - name: gha-runner-scale-set
-    version: 0.14.2
-    repository: "oci://ghcr.io/actions/actions-runner-controller-charts"
-    alias: ghaArcScaleSetStatelessAmdEduide
-    condition: ghaArcScaleSetStatelessAmdEduide.enabled
-
-  # ARC scale set: stateless ARM64 runner set for EduIDE. Disabled in the current BuildKit topology.
-  - name: gha-runner-scale-set
-    version: 0.14.2
-    repository: "oci://ghcr.io/actions/actions-runner-controller-charts"
-    alias: ghaArcScaleSetStatelessArmEduide
-    condition: ghaArcScaleSetStatelessArmEduide.enabled
-
   # ARC scale set: AMD64 BuildKit runner set for EduIDE.
   - name: gha-runner-scale-set
     version: 0.14.2

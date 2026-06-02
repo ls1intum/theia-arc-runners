@@ -214,8 +214,6 @@ jobs:
             -f ${HELM_VALUES} \
             --set createNamespaces=false \
             --set ghaArcController.enabled=true \
-            --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-            --set ghaArcScaleSetStatelessArmEduide.enabled=false \
             --set ghaArcScaleSetAmdEduide.enabled=false \
             --set ghaArcScaleSetArmEduide.enabled=false \
             --set ghaArcScaleSetAmdLs1intum.enabled=false \

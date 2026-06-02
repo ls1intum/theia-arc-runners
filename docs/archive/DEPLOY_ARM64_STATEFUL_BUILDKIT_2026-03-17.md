@@ -71,7 +71,6 @@ helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-parma.yaml \
   --set ghaArcController.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=true \
   --wait --timeout 10m
 ```

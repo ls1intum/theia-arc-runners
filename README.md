@@ -54,6 +54,8 @@ Runner pods keep the DinD + runner sidecar layout. Docker builds are routed to r
 - `BUILDKIT_NAMESPACE`
 - `BUILDKIT_NUM_WORKERS`
 
+BuildKit workers run as separate StatefulSet pods with persistent PVC-backed cache. This keeps runner pods disposable while preserving Docker layer cache, BuildKit cache layers, and BuildKit cache mounts across workflow runs. For more context, see [ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md).
+
 ## Deployment
 
 See [AGENTS.md](AGENTS.md) for the canonical commands and safety notes.
@@ -113,8 +115,6 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-stud.yaml \
   --set createNamespaces=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -128,8 +128,6 @@ helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values-stud.yaml \
   --set createNamespaces=false \
   --set ghaArcController.enabled=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=true \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=true \
@@ -156,8 +154,6 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-theia-prod.yaml \
   --set createNamespaces=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -171,8 +167,6 @@ helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values-theia-prod.yaml \
   --set createNamespaces=false \
   --set ghaArcController.enabled=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=true \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=true \
@@ -199,8 +193,6 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-parma.yaml \
   --set createNamespaces=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -214,8 +206,6 @@ helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values-parma.yaml \
   --set createNamespaces=false \
   --set ghaArcController.enabled=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=true \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -260,7 +250,7 @@ Expected runner sets:
 
 - [Architecture](docs/ARCHITECTURE_V2.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [BuildKit ARM64 deployment record](docs/DEPLOY_ARM64_STATEFUL_BUILDKIT_2026-03-17.md)
+- [BuildKit ARM64 deployment record](docs/archive/DEPLOY_ARM64_STATEFUL_BUILDKIT_2026-03-17.md)
 
 ## Cleanup
 

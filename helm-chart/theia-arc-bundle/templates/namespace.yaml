@@ -6,7 +6,7 @@ metadata:
   labels:
     {{- include "theia-arc-bundle.labels" . | nindent 4 }}
 {{- end }}
-{{- if and (or .Values.ghaArcScaleSetStatelessAmdEduide.enabled .Values.ghaArcScaleSetStatelessArmEduide.enabled .Values.ghaArcScaleSetAmdEduide.enabled .Values.ghaArcScaleSetArmEduide.enabled .Values.ghaArcScaleSetAmdLs1intum.enabled .Values.ghaArcScaleSetArmLs1intum.enabled) .Values.createNamespaces }}
+{{- if and (or .Values.ghaArcScaleSetAmdEduide.enabled .Values.ghaArcScaleSetArmEduide.enabled .Values.ghaArcScaleSetAmdLs1intum.enabled .Values.ghaArcScaleSetArmLs1intum.enabled) .Values.createNamespaces }}
 ---
 apiVersion: v1
 kind: Namespace

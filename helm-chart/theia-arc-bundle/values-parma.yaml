@@ -10,11 +10,6 @@ global:
 # Set to false to avoid Helm SSA ownership conflicts on upgrade.
 createNamespaces: false
 
-ghaArcScaleSetStatelessAmdEduide:
-  enabled: false
-
-ghaArcScaleSetStatelessArmEduide:
-  enabled: false
 
 ghaArcScaleSetAmdEduide:
   enabled: false

@@ -18,145 +18,6 @@ createNamespaces: true
 ghaArcController:
   enabled: true
 
-ghaArcScaleSetStatelessAmdEduide:
-  enabled: false
-  githubConfigUrl: "https://github.com/EduIDE"
-  githubConfigSecret: "github-arc-secret-eduidec"
-  minRunners: 10
-  maxRunners: 50
-  runnerScaleSetName: "arc-stateless-eduide"
-  controllerServiceAccount:
-    namespace: arc-systems
-    # This must match <Part-1-release-name>-gha-rs-controller.
-    # Part 1 MUST be deployed with: helm install theia-arc-systems ...
-    name: theia-arc-systems-gha-rs-controller
-  template:
-    spec:
-      serviceAccountName: arc-runner-set-stateless-sa
-      initContainers:
-        - name: init-dind-externals
-          image: ghcr.io/actions/actions-runner:latest
-          command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
-          volumeMounts:
-            - name: dind-externals
-              mountPath: /home/runner/tmpDir
-      containers:
-        - name: dind
-          image: docker:dind
-          args:
-            - dockerd
-            - --host=unix:///var/run/docker.sock
-            - --group=1001
-            # Route docker.io pulls through Zot pull-through cache to avoid Docker Hub rate limits.
-            - --registry-mirror=http://131.159.88.117:30081
-            - --insecure-registry=131.159.88.117:30081
-          securityContext:
-            privileged: true
-          volumeMounts:
-            - name: work
-              mountPath: /home/runner/_work
-            - name: dind-sock
-              mountPath: /var/run
-            - name: dind-externals
-              mountPath: /home/runner/externals
-        - name: runner
-          image: ghcr.io/actions/actions-runner:latest
-          command: ["/home/runner/run.sh"]
-          env:
-            - name: DOCKER_HOST
-              value: unix:///var/run/docker.sock
-            - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
-              value: "false"
-          volumeMounts:
-            - name: work
-              mountPath: /home/runner/_work
-            - name: dind-sock
-              mountPath: /var/run
-          resources:
-            requests:
-              cpu: 500m
-              memory: 1Gi
-            limits:
-              cpu: 4000m
-              memory: 8Gi
-      volumes:
-        - name: work
-          emptyDir: {}
-        - name: dind-sock
-          emptyDir: {}
-        - name: dind-externals
-          emptyDir: {}
-
-ghaArcScaleSetStatelessArmEduide:
-  enabled: false
-  githubConfigUrl: "https://github.com/EduIDE"
-  githubConfigSecret: "github-arc-secret-eduidec"
-  minRunners: 10
-  maxRunners: 50
-  runnerScaleSetName: "arc-stateless-eduide-arm64"
-  controllerServiceAccount:
-    namespace: arc-systems
-    # Must match <Part-1-release-name>-gha-rs-controller (release name must be theia-arc-systems)
-    name: theia-arc-systems-gha-rs-controller
-  template:
-    spec:
-      serviceAccountName: arc-runner-set-stateless-arm-sa
-      initContainers:
-        - name: init-dind-externals
-          image: ghcr.io/actions/actions-runner:latest
-          command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
-          volumeMounts:
-            - name: dind-externals
-              mountPath: /home/runner/tmpDir
-      containers:
-        - name: dind
-          image: docker:dind
-          args:
-            - dockerd
-            - --host=unix:///var/run/docker.sock
-            - --group=1001
-            # Route docker.io pulls through Zot NodePort reachable cross-cluster.
-            - --registry-mirror=http://131.159.88.117:30081
-            - --insecure-registry=131.159.88.117:30081
-          securityContext:
-            privileged: true
-          volumeMounts:
-            - name: work
-              mountPath: /home/runner/_work
-            - name: dind-sock
-              mountPath: /var/run
-            - name: dind-externals
-              mountPath: /home/runner/externals
-        - name: runner
-          image: ghcr.io/actions/actions-runner:latest
-          command: ["/home/runner/run.sh"]
-          env:
-            - name: DOCKER_HOST
-              value: unix:///var/run/docker.sock
-            - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
-              value: "false"
-          volumeMounts:
-            - name: work
-              mountPath: /home/runner/_work
-            - name: dind-sock
-              mountPath: /var/run
-          resources:
-            requests:
-              cpu: 500m
-              memory: 1Gi
-            limits:
-              cpu: 4000m
-              memory: 8Gi
-      volumes:
-        - name: work
-          emptyDir:
-            medium: Memory
-            sizeLimit: 30Gi
-        - name: dind-sock
-          emptyDir: {}
-        - name: dind-externals
-          emptyDir: {}
-
 # AMD64 BuildKit runner set that routes docker builds to stateful BuildKit workers.
 # BuildKit workers live in the buildkit-exp namespace (raw manifests).
 # Workflows opt in explicitly with: runs-on: arc-buildkit-eduide-amd64
@@ -175,7 +36,7 @@ ghaArcScaleSetAmdEduide:
     numWorkers: 7
   template:
     spec:
-      serviceAccountName: arc-runner-set-stateless-sa
+      serviceAccountName: arc-runner-set-amd-sa
       initContainers:
         - name: init-dind-externals
           image: ghcr.io/actions/actions-runner:latest
@@ -253,7 +114,7 @@ ghaArcScaleSetAmdLs1intum:
     numWorkers: 7
   template:
     spec:
-      serviceAccountName: arc-runner-set-stateless-sa
+      serviceAccountName: arc-runner-set-amd-sa
       initContainers:
         - name: init-dind-externals
           image: ghcr.io/actions/actions-runner:latest
@@ -329,7 +190,7 @@ ghaArcScaleSetArmEduide:
     numWorkers: 7
   template:
     spec:
-      serviceAccountName: arc-runner-set-stateless-arm-sa
+      serviceAccountName: arc-runner-set-arm-sa
       initContainers:
         - name: init-dind-externals
           image: ghcr.io/actions/actions-runner:latest
@@ -405,7 +266,7 @@ ghaArcScaleSetArmLs1intum:
     numWorkers: 7
   template:
     spec:
-      serviceAccountName: arc-runner-set-stateless-arm-sa
+      serviceAccountName: arc-runner-set-arm-sa
       initContainers:
         - name: init-dind-externals
           image: ghcr.io/actions/actions-runner:latest

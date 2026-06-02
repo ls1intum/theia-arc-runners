@@ -2,7 +2,7 @@
 
 ## Overview
 
-Ephemeral GitHub Actions runners backed by stateful BuildKit workers and a Zot pull-through cache. Runner pods are stateless; BuildKit cache persists on dedicated worker PVCs.
+Ephemeral GitHub Actions runners backed by stateful BuildKit workers and a Zot pull-through cache. Runner pods are disposable; BuildKit cache persists on dedicated worker PVCs so Docker layer cache, BuildKit cache layers, and BuildKit cache mounts survive between workflow runs.
 
 ## Clusters
 
@@ -106,7 +106,7 @@ The chart is deployed in **two separate Helm releases** because Helm 3 cannot de
 | Resource | Namespace | Size | Storage Class |
 |----------|-----------|------|---------------|
 | Zot PVC | `zot-system` | 250Gi | `longhorn` |
-| BuildKit worker PVCs | `buildkit-exp` / `buildkit` | 7 x 500Gi per cluster | `csi-rbd-sc` / `longhorn` |
+| BuildKit worker PVCs | `buildkit-exp` / `buildkit` | 7 x 100Gi per cluster | `csi-rbd-sc` / `longhorn` |
 
 ## Verification
 

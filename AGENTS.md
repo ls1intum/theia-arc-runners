@@ -31,8 +31,6 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-stud.yaml \
   --set createNamespaces=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -45,8 +43,6 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-theia-prod.yaml \
   --set createNamespaces=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -59,8 +55,6 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-parma.yaml \
   --set createNamespaces=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -106,8 +100,6 @@ helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values-stud.yaml \
   --set createNamespaces=false \
   --set ghaArcController.enabled=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=true \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=true \
@@ -121,8 +113,6 @@ helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values-theia-prod.yaml \
   --set createNamespaces=false \
   --set ghaArcController.enabled=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=true \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=true \
@@ -136,8 +126,6 @@ helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values-parma.yaml \
   --set createNamespaces=false \
   --set ghaArcController.enabled=false \
-  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
-  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=true \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -215,7 +203,7 @@ kubectl delete namespace arc-runners arc-systems zot-system buildkit buildkit-ex
 │   ├── stud/buildkit-exp/         # AMD64 BuildKit StatefulSet manifests
 │   ├── theia-prod/buildkit-exp/   # AMD64 BuildKit StatefulSet manifests
 │   └── parma/buildkit/            # ARM64 BuildKit StatefulSet manifests
-└── docs/                          # Operational plans and architecture notes
+└── docs/                          # Current architecture/troubleshooting plus archived historical notes
 ```
 
 ---
@@ -264,5 +252,6 @@ Three deployable releases/components are used:
 - `externalSecrets.enabled: false` by default; auth secrets are managed explicitly.
 - The old self-hosted actions cache subchart has been removed from the active bundle.
 - Runner pods use the official `ghcr.io/actions/actions-runner:latest` image.
+- BuildKit workers are separate StatefulSet pods so Docker layer cache, BuildKit cache layers, and cache mounts persist outside disposable runner pods.
 - Keep docs aligned with manifests; when mismatched, trust `values.yaml`, `values-<cluster>.yaml`, and `infra/**` YAML.
 - Zot startup can fail on low inotify settings (`failed to create a new hot reloader`); raise node inotify limits and restart pod.
