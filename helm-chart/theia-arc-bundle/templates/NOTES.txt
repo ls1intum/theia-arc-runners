@@ -100,7 +100,7 @@ TROUBLESHOOTING
 If workflows don't trigger runners:
   kubectl logs -n arc-systems -l app.kubernetes.io/name=gha-runner-scale-set-controller
   kubectl get secret github-arc-secret-eduidec -n arc-runners
-  kubectl get secret github-arc-secret -n arc-runners
+  kubectl get secret github-arc-secret-ls1intum -n arc-runners
 
 For more help:
   Repository: https://github.com/ls1intum/theia-arc-runners

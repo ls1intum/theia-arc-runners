@@ -80,7 +80,7 @@ kubectl create secret generic github-arc-secret-eduidec \
   --from-file=github_app_private_key=<path-to-private-key.pem>
 
 # ls1intum GitHub App
-kubectl create secret generic github-arc-secret \
+kubectl create secret generic github-arc-secret-ls1intum \
   --namespace=arc-runners \
   --from-literal=github_app_id="<APP_ID>" \
   --from-literal=github_app_installation_id="<INSTALLATION_ID>" \

@@ -92,8 +92,9 @@ kubectl get pods -n arc-systems | grep listener
 # Check controller logs
 kubectl logs -n arc-systems -l app.kubernetes.io/name=gha-runner-scale-set-controller --tail=50
 
-# Verify secret exists and has required keys
+# Verify both org secrets exist and have required keys
 kubectl get secret github-arc-secret-eduidec -n arc-runners -o jsonpath='{.data}' | jq 'keys'
+kubectl get secret github-arc-secret-ls1intum -n arc-runners -o jsonpath='{.data}' | jq 'keys'
 ```
 
 ### Runner pods not starting (stuck Pending)

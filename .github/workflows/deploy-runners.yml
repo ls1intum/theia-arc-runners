@@ -188,7 +188,7 @@ jobs:
             "${EDUIDEC_GITHUB_APP_PRIVATE_KEY}"
 
           create_github_secret \
-            github-arc-secret \
+            github-arc-secret-ls1intum \
             "${LS1INTUM_GITHUB_APP_ID}" \
             "${LS1INTUM_GITHUB_APP_INSTALLATION_ID}" \
             "${LS1INTUM_GITHUB_APP_PRIVATE_KEY}"

@@ -102,7 +102,7 @@ ghaArcScaleSetAmdEduide:
 ghaArcScaleSetAmdLs1intum:
   enabled: false
   githubConfigUrl: "https://github.com/ls1intum"
-  githubConfigSecret: "github-arc-secret"
+  githubConfigSecret: "github-arc-secret-ls1intum"
   minRunners: 10
   maxRunners: 50
   runnerScaleSetName: "arc-buildkit-ls1intum-theiaprod-amd64"
@@ -254,7 +254,7 @@ ghaArcScaleSetArmEduide:
 ghaArcScaleSetArmLs1intum:
   enabled: false
   githubConfigUrl: "https://github.com/ls1intum"
-  githubConfigSecret: "github-arc-secret"
+  githubConfigSecret: "github-arc-secret-ls1intum"
   minRunners: 10
   maxRunners: 50
   runnerScaleSetName: "arc-buildkit-ls1intum-parma-arm64"

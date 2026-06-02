@@ -42,7 +42,7 @@ Helm cannot deploy subcharts to different namespaces in a single release. We dep
 2. Helm v3.8+
 3. GitHub App secrets in `arc-runners`:
    - `github-arc-secret-eduidec` for EduIDE
-   - `github-arc-secret` for ls1intum
+   - `github-arc-secret-ls1intum` for ls1intum
 4. Storage classes:
    - `csi-rbd-sc` on stud/theia-prod
    - `longhorn` on parma
@@ -166,6 +166,6 @@ kubectl get pods -n arc-runners
 
 ## Troubleshooting pointers
 
-- If runner sets do not register, verify `github-arc-secret-eduidec` and `github-arc-secret` exist in `arc-runners`.
+- If runner sets do not register, verify `github-arc-secret-eduidec` and `github-arc-secret-ls1intum` exist in `arc-runners`.
 - If jobs do not use BuildKit workers, verify runner env vars (`BUILDKIT_NAMESPACE`, `BUILDKIT_NUM_WORKERS`) in generated pods.
 - If image pulls bypass cache, inspect DinD args for mirror endpoint `131.159.88.117:30081`.
