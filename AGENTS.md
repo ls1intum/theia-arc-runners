@@ -151,14 +151,22 @@ helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
 ### Helm — Deploy Part 3 (Zot standalone on parma)
 
 ```bash
+kubectl create namespace zot-system --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic zot-dockerhub-credentials \
+  --namespace=zot-system \
+  --from-file=credentials.json=<path-to-dockerhub-credentials.json> \
+  --dry-run=client -o yaml | kubectl apply -f -
+
 cd helm-chart/theia-zot
 
 helm upgrade --install theia-zot . \
-  --namespace zot-system --create-namespace \
+  --namespace zot-system \
   -f values.yaml \
   -f values-parma.yaml \
   --wait --timeout 10m
 ```
+
+`zot-dockerhub-credentials` must exist before the Helm install because the Zot StatefulSet mounts it as `/etc/zot-credentials/credentials.json`.
 
 ### Verify Deployment
 
@@ -285,6 +293,7 @@ Runner scale set `minRunners: 10` and `maxRunners: 50` are arbitrary baselines t
 - `createNamespaces: false` is intentional in the documented flow because namespaces are created before Helm and Part 1 / Part 2 are separate releases.
 - Assign `arc-systems`, `arc-runners`, `buildkit`, and on parma `zot-system` to the matching Rancher project after namespace creation.
 - GitHub App auth secrets are managed explicitly; the active chart does not create them.
+- Zot Docker Hub sync credentials are managed explicitly in `zot-dockerhub-credentials`; the active Zot chart does not create this secret.
 - The old self-hosted actions cache subchart has been removed from the active bundle.
 - Runner pods use the official `ghcr.io/actions/actions-runner:latest` image.
 - BuildKit workers are separate StatefulSet pods so Docker layer cache, BuildKit cache layers, and cache mounts persist outside disposable runner pods.

@@ -252,14 +252,22 @@ The current shared Zot deployment runs on `parma` and is consumed by all runner 
 
 ```bash
 kubectl config use-context parma
-cd helm-chart/theia-zot
 
+kubectl create namespace zot-system --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic zot-dockerhub-credentials \
+  --namespace=zot-system \
+  --from-file=credentials.json=<path-to-dockerhub-credentials.json> \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+cd helm-chart/theia-zot
 helm upgrade --install theia-zot . \
-  --namespace zot-system --create-namespace \
+  --namespace zot-system \
   -f values.yaml \
   -f values-parma.yaml \
   --wait --timeout 10m
 ```
+
+`zot-dockerhub-credentials` must exist before the Helm install because the Zot config mounts `/etc/zot-credentials/credentials.json` as the Docker Hub sync credentials file. The file is sensitive and is not stored in this repository.
 
 ### Verify
 

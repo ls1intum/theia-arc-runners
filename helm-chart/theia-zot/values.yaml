@@ -57,6 +57,7 @@ zot:
   extraVolumes:
     - name: zot-credentials
       secret:
+        # Created outside Helm; see README Zot install step.
         secretName: zot-dockerhub-credentials
   extraVolumeMounts:
     - name: zot-credentials

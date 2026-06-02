@@ -140,6 +140,16 @@ Then re-run the `helm install` / `helm upgrade` command.
 
 ### `helm upgrade` fails in `theia-zot` with startup crash
 
+If the Zot pod is stuck in `ContainerCreating` and events show `secret "zot-dockerhub-credentials" not found`, create the Docker Hub credentials secret before re-running Helm:
+
+```bash
+kubectl --context parma create namespace zot-system --dry-run=client -o yaml | kubectl --context parma apply -f -
+kubectl --context parma create secret generic zot-dockerhub-credentials \
+  --namespace=zot-system \
+  --from-file=credentials.json=<path-to-dockerhub-credentials.json> \
+  --dry-run=client -o yaml | kubectl --context parma apply -f -
+```
+
 If Zot fails with `failed to create a new hot reloader` / `too many open files`, increase node inotify limits on the parma node and restart Zot:
 
 ```bash
