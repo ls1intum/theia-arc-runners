@@ -90,14 +90,14 @@ jobs:
 
           case "${{ inputs.cluster }}" in
             stud)
-              echo "buildkit_path=infra/stud/buildkit-exp" >> "${GITHUB_OUTPUT}"
+              echo "buildkit_path=infra/stud/buildkit" >> "${GITHUB_OUTPUT}"
               echo "helm_values=helm-chart/theia-arc-bundle/values.yaml -f helm-chart/theia-arc-bundle/values-stud.yaml" >> "${GITHUB_OUTPUT}"
-              echo "buildkit_namespace=buildkit-exp" >> "${GITHUB_OUTPUT}"
+              echo "buildkit_namespace=buildkit" >> "${GITHUB_OUTPUT}"
               ;;
             theia-prod)
-              echo "buildkit_path=infra/theia-prod/buildkit-exp" >> "${GITHUB_OUTPUT}"
+              echo "buildkit_path=infra/theia-prod/buildkit" >> "${GITHUB_OUTPUT}"
               echo "helm_values=helm-chart/theia-arc-bundle/values.yaml -f helm-chart/theia-arc-bundle/values-theia-prod.yaml" >> "${GITHUB_OUTPUT}"
-              echo "buildkit_namespace=buildkit-exp" >> "${GITHUB_OUTPUT}"
+              echo "buildkit_namespace=buildkit" >> "${GITHUB_OUTPUT}"
               ;;
             parma)
               echo "buildkit_path=infra/parma/buildkit" >> "${GITHUB_OUTPUT}"

@@ -8,8 +8,8 @@ BuildKit-focused runner sets backed by stateful BuildKit workers and a shared Zo
 
 | Cluster | Architecture | Runner Sets | BuildKit Namespace | BuildKit Storage Class | Zot Mirror |
 |---------|--------------|-------------|--------------------|------------------------|------------|
-| stud | AMD64 | `arc-buildkit-eduide-stud-amd64`, `arc-buildkit-ls1intum-stud-amd64` | `buildkit-exp` | `csi-rbd-sc` | `131.159.88.117:30081` |
-| theia-prod | AMD64 | `arc-buildkit-eduide-theiaprod-amd64`, `arc-buildkit-ls1intum-theiaprod-amd64` | `buildkit-exp` | `csi-rbd-sc` | `131.159.88.117:30081` |
+| stud | AMD64 | `arc-buildkit-eduide-stud-amd64`, `arc-buildkit-ls1intum-stud-amd64` | `buildkit` | `csi-rbd-sc` | `131.159.88.117:30081` |
+| theia-prod | AMD64 | `arc-buildkit-eduide-theiaprod-amd64`, `arc-buildkit-ls1intum-theiaprod-amd64` | `buildkit` | `csi-rbd-sc` | `131.159.88.117:30081` |
 | parma | ARM64 | `arc-buildkit-eduide-parma-arm64`, `arc-buildkit-ls1intum-parma-arm64` | `buildkit` | `longhorn` | `131.159.88.117:30081` |
 
 Use `helm-chart/theia-arc-bundle/values.yaml` plus exactly one cluster overlay:
@@ -95,12 +95,12 @@ The documented Helm flow creates namespaces before Helm runs and therefore sets 
 kubectl config use-context stud
 
 # Part 0: BuildKit workers
-kubectl apply -f infra/stud/buildkit-exp/namespace.yaml
-kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/buildkit-exp --timeout=60s
-kubectl apply -f infra/stud/buildkit-exp/configmap.yaml
-kubectl apply -f infra/stud/buildkit-exp/service.yaml
-kubectl apply -f infra/stud/buildkit-exp/statefulset.yaml
-kubectl rollout status statefulset/buildkitd -n buildkit-exp --timeout=10m
+kubectl apply -f infra/stud/buildkit/namespace.yaml
+kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/buildkit --timeout=60s
+kubectl apply -f infra/stud/buildkit/configmap.yaml
+kubectl apply -f infra/stud/buildkit/service.yaml
+kubectl apply -f infra/stud/buildkit/statefulset.yaml
+kubectl rollout status statefulset/buildkitd -n buildkit --timeout=10m
 
 # Part 1: Controller
 helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
@@ -135,12 +135,12 @@ helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
 kubectl config use-context theia-prod
 
 # Part 0: BuildKit workers
-kubectl apply -f infra/theia-prod/buildkit-exp/namespace.yaml
-kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/buildkit-exp --timeout=60s
-kubectl apply -f infra/theia-prod/buildkit-exp/configmap.yaml
-kubectl apply -f infra/theia-prod/buildkit-exp/service.yaml
-kubectl apply -f infra/theia-prod/buildkit-exp/statefulset.yaml
-kubectl rollout status statefulset/buildkitd -n buildkit-exp --timeout=10m
+kubectl apply -f infra/theia-prod/buildkit/namespace.yaml
+kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/buildkit --timeout=60s
+kubectl apply -f infra/theia-prod/buildkit/configmap.yaml
+kubectl apply -f infra/theia-prod/buildkit/service.yaml
+kubectl apply -f infra/theia-prod/buildkit/statefulset.yaml
+kubectl rollout status statefulset/buildkitd -n buildkit --timeout=10m
 
 # Part 1: Controller
 helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
@@ -233,8 +233,8 @@ kubectl get autoscalingrunnersets -n arc-runners
 kubectl get pvc -n zot-system
 
 # BuildKit workers
-kubectl --context=stud get pods -n buildkit-exp
-kubectl --context=theia-prod get pods -n buildkit-exp
+kubectl --context=stud get pods -n buildkit
+kubectl --context=theia-prod get pods -n buildkit
 kubectl --context=parma get pods -n buildkit
 ```
 
@@ -256,5 +256,5 @@ Expected runner sets:
 helm uninstall theia-arc-runners -n arc-runners
 helm uninstall theia-arc-systems -n arc-systems
 helm uninstall theia-zot -n zot-system
-kubectl delete namespace arc-runners arc-systems zot-system buildkit buildkit-exp --ignore-not-found=true
+kubectl delete namespace arc-runners arc-systems zot-system buildkit buildkit --ignore-not-found=true
 ```

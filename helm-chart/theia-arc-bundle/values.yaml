@@ -19,7 +19,7 @@ ghaArcController:
   enabled: true
 
 # AMD64 BuildKit runner set that routes docker builds to stateful BuildKit workers.
-# BuildKit workers live in the buildkit-exp namespace (raw manifests).
+# BuildKit workers live in the buildkit namespace (raw manifests).
 # Workflows opt in explicitly with: runs-on: arc-buildkit-eduide-theiaprod-amd64
 ghaArcScaleSetAmdEduide:
   enabled: false
@@ -32,7 +32,7 @@ ghaArcScaleSetAmdEduide:
     namespace: arc-systems
     name: theia-arc-systems-gha-rs-controller
   buildkit:
-    namespace: buildkit-exp
+    namespace: buildkit
     numWorkers: 7
   template:
     spec:
@@ -73,7 +73,7 @@ ghaArcScaleSetAmdEduide:
             # Injected into every job so workflow steps can compute the correct BuildKit worker
             # address without hard-coding the namespace or replica count.
             - name: BUILDKIT_NAMESPACE
-              value: buildkit-exp
+              value: buildkit
             - name: BUILDKIT_NUM_WORKERS
               value: "7"
           volumeMounts:
@@ -110,7 +110,7 @@ ghaArcScaleSetAmdLs1intum:
     namespace: arc-systems
     name: theia-arc-systems-gha-rs-controller
   buildkit:
-    namespace: buildkit-exp
+    namespace: buildkit
     numWorkers: 7
   template:
     spec:
@@ -149,7 +149,7 @@ ghaArcScaleSetAmdLs1intum:
             - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
               value: "false"
             - name: BUILDKIT_NAMESPACE
-              value: buildkit-exp
+              value: buildkit
             - name: BUILDKIT_NUM_WORKERS
               value: "7"
           volumeMounts:

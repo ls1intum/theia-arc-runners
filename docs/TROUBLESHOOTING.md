@@ -162,7 +162,7 @@ kubectl get pods -n arc-runners
 
 # PVCs (Zot + BuildKit)
 kubectl get pvc -n zot-system
-kubectl get pvc -n buildkit-exp   # theia-prod
+kubectl get pvc -n buildkit   # theia-prod
 kubectl get pvc -n buildkit       # parma
 
 # Controller logs

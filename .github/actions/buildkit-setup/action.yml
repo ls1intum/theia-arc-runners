@@ -5,7 +5,8 @@ description: >
   pointing at that worker.
 
   Prerequisites:
-    - Must run on the experimental runner set (runs-on: arc-runner-set-buildkit-exp).
+    - Must run on one of the BuildKit runner sets, for example
+      arc-buildkit-eduide-stud-amd64 or arc-buildkit-eduide-parma-arm64.
     - The runner pod already has BUILDKIT_NAMESPACE and BUILDKIT_NUM_WORKERS in its environment
       (injected by the ARC runner template in values.yaml). These inputs default to those env vars.
 
@@ -19,7 +20,7 @@ inputs:
     required: false
     default: "Dockerfile"
   num-workers:
-    description: "Number of BuildKit workers. Defaults to the BUILDKIT_NUM_WORKERS env var set by the runner template (5)."
+    description: "Number of BuildKit workers. Defaults to the BUILDKIT_NUM_WORKERS env var set by the runner template."
     required: false
     default: "${{ env.BUILDKIT_NUM_WORKERS }}"
   namespace:
@@ -32,7 +33,7 @@ outputs:
     description: "Zero-based index of the selected BuildKit worker (0 … num-workers−1)."
     value: ${{ steps.route.outputs.worker_id }}
   endpoint:
-    description: "Full TCP address of the selected BuildKit worker, e.g. tcp://buildkitd-2.buildkitd.buildkit-exp.svc.cluster.local:1234"
+    description: "Full TCP address of the selected BuildKit worker, e.g. tcp://buildkitd-2.buildkitd.buildkit.svc.cluster.local:1234"
     value: ${{ steps.route.outputs.addr }}
 
 runs:
@@ -49,11 +50,11 @@ runs:
         set -euo pipefail
 
         if [[ -z "${NUM_WORKERS:-}" || "${NUM_WORKERS}" == "0" ]]; then
-          echo "::error::num-workers is not set. Is this job running on arc-runner-set-buildkit-exp?"
+          echo "::error::num-workers is not set. Is this job running on a BuildKit runner set?"
           exit 1
         fi
         if [[ -z "${BK_NAMESPACE:-}" ]]; then
-          echo "::error::namespace is not set. Is this job running on arc-runner-set-buildkit-exp?"
+          echo "::error::namespace is not set. Is this job running on a BuildKit runner set?"
           exit 1
         fi
 

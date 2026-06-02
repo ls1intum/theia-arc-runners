@@ -69,20 +69,20 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
 
 ```bash
 # stud
-kubectl apply -f infra/stud/buildkit-exp/namespace.yaml
-kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/buildkit-exp --timeout=60s
-kubectl apply -f infra/stud/buildkit-exp/configmap.yaml
-kubectl apply -f infra/stud/buildkit-exp/service.yaml
-kubectl apply -f infra/stud/buildkit-exp/statefulset.yaml
-kubectl rollout status statefulset/buildkitd -n buildkit-exp --timeout=10m
+kubectl apply -f infra/stud/buildkit/namespace.yaml
+kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/buildkit --timeout=60s
+kubectl apply -f infra/stud/buildkit/configmap.yaml
+kubectl apply -f infra/stud/buildkit/service.yaml
+kubectl apply -f infra/stud/buildkit/statefulset.yaml
+kubectl rollout status statefulset/buildkitd -n buildkit --timeout=10m
 
 # theia-prod
-kubectl apply -f infra/theia-prod/buildkit-exp/namespace.yaml
-kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/buildkit-exp --timeout=60s
-kubectl apply -f infra/theia-prod/buildkit-exp/configmap.yaml
-kubectl apply -f infra/theia-prod/buildkit-exp/service.yaml
-kubectl apply -f infra/theia-prod/buildkit-exp/statefulset.yaml
-kubectl rollout status statefulset/buildkitd -n buildkit-exp --timeout=10m
+kubectl apply -f infra/theia-prod/buildkit/namespace.yaml
+kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/buildkit --timeout=60s
+kubectl apply -f infra/theia-prod/buildkit/configmap.yaml
+kubectl apply -f infra/theia-prod/buildkit/service.yaml
+kubectl apply -f infra/theia-prod/buildkit/statefulset.yaml
+kubectl rollout status statefulset/buildkitd -n buildkit --timeout=10m
 
 # parma
 kubectl apply -f infra/parma/buildkit/namespace.yaml
@@ -157,7 +157,7 @@ kubectl get autoscalingrunnersets -n arc-runners
 kubectl get pvc -n zot-system
 
 # BuildKit workers
-kubectl get pods -n buildkit-exp   # theia-prod
+kubectl get pods -n buildkit   # theia-prod
 kubectl get pods -n buildkit       # parma
 ```
 
@@ -177,7 +177,7 @@ helm template helm-chart/theia-zot/ | kubectl apply --dry-run=client -f -
 helm uninstall theia-arc-runners -n arc-runners
 helm uninstall theia-arc-systems -n arc-systems
 helm uninstall theia-zot -n zot-system
-kubectl delete namespace arc-runners arc-systems zot-system buildkit buildkit-exp --ignore-not-found=true
+kubectl delete namespace arc-runners arc-systems zot-system buildkit buildkit --ignore-not-found=true
 ```
 
 ---
@@ -203,8 +203,8 @@ kubectl delete namespace arc-runners arc-systems zot-system buildkit buildkit-ex
 │   │       └── gha-runner-scale-set-controller-0.14.2.tgz
 │   └── theia-zot/                 # Standalone Zot Helm wrapper chart
 ├── infra/
-│   ├── stud/buildkit-exp/         # AMD64 BuildKit StatefulSet manifests
-│   ├── theia-prod/buildkit-exp/   # AMD64 BuildKit StatefulSet manifests
+│   ├── stud/buildkit/         # AMD64 BuildKit StatefulSet manifests
+│   ├── theia-prod/buildkit/   # AMD64 BuildKit StatefulSet manifests
 │   └── parma/buildkit/            # ARM64 BuildKit StatefulSet manifests
 └── docs/                          # Current architecture/troubleshooting plus archived historical notes
 ```
@@ -226,7 +226,7 @@ Three deployable releases/components are used:
 
 **Build execution:** GitHub jobs run on ARC runners with DinD + runner containers. Docker builds are routed by workflow logic to stateful BuildKit workers:
 
-- stud/theia-prod workers: namespace `buildkit-exp` (`csi-rbd-sc`, 7 replicas)
+- stud/theia-prod workers: namespace `buildkit` (`csi-rbd-sc`, 7 replicas)
 - parma workers: namespace `buildkit` (`longhorn`, 7 replicas)
 
 ---
@@ -239,7 +239,7 @@ Three deployable releases/components are used:
   - `theia-zot` (Part 3)
 - Namespaces:
   - `arc-systems`, `arc-runners`, `zot-system`
-  - `buildkit-exp` (stud/theia-prod BuildKit), `buildkit` (parma BuildKit)
+  - `buildkit` (stud/theia-prod BuildKit), `buildkit` (parma BuildKit)
 - Active runner set names:
   - `arc-buildkit-eduide-theiaprod-amd64`
   - `arc-buildkit-eduide-parma-arm64`

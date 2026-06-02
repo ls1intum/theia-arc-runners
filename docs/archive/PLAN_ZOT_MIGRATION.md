@@ -24,7 +24,7 @@
 
 ## BuildKit mirror configuration (current)
 
-- theia-prod BuildKit configmap (`buildkit-exp`):
+- theia-prod BuildKit configmap (`buildkit`):
   - `docker.io` mirror → `http://131.159.88.117:30081`
 - parma BuildKit configmap (`buildkit`):
   - `docker.io` mirror → `http://theia-zot.zot-system.svc.cluster.local:5000`

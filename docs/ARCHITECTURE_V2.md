@@ -107,7 +107,7 @@ The chart is deployed in **two separate Helm releases** because Helm 3 cannot de
 | Resource | Namespace | Size | Storage Class |
 |----------|-----------|------|---------------|
 | Zot PVC | `zot-system` | 250Gi | `longhorn` |
-| BuildKit worker PVCs | `buildkit-exp` / `buildkit` | 7 x 100Gi per cluster | `csi-rbd-sc` / `longhorn` |
+| BuildKit worker PVCs | `buildkit` / `buildkit` | 7 x 100Gi per cluster | `csi-rbd-sc` / `longhorn` |
 
 BuildKit StatefulSets use soft pod anti-affinity across `kubernetes.io/hostname`: workers prefer different nodes, but scheduling can still proceed if the cluster cannot spread all replicas.
 

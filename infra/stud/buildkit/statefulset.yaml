@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: buildkitd
-  namespace: buildkit-exp
+  namespace: buildkit
   labels:
     app: buildkitd
     app.kubernetes.io/name: buildkitd

@@ -4,8 +4,9 @@
 # build-push steps to your actual image/tags. The only required changes from a
 # standard build workflow are:
 #
-#   1. runs-on: arc-runner-set-buildkit-exp      ← experimental runner set
-#   2. - uses: ls1intum/theia-arc-runners/.github/actions/buildkit-setup@feat/stateful-buildkit-runners
+#   1. runs-on: arc-buildkit-eduide-stud-amd64
+#      or another current BuildKit runner set for the target org/cluster.
+#   2. - uses: ls1intum/theia-arc-runners/.github/actions/buildkit-setup@main
 #      with:
 #        dockerfile: path/to/your/Dockerfile    ← per-Dockerfile cache locality
 #
@@ -13,7 +14,7 @@
 #
 # NOTE: This is an example file — it is not a real workflow executed by this repo.
 
-name: Build (BuildKit experimental)
+name: Build (BuildKit)
 
 on:
   workflow_dispatch:
@@ -23,9 +24,8 @@ on:
 jobs:
   build:
     name: Build and push image
-    # Opt into the experimental runner set that connects to stateful BuildKit workers.
-    # Production jobs continue using: runs-on: arc-runner-set-stateless
-    runs-on: arc-runner-set-buildkit-exp
+    # Opt into a BuildKit runner set that connects to stateful BuildKit workers.
+    runs-on: arc-buildkit-eduide-stud-amd64
 
     permissions:
       contents: read
@@ -41,7 +41,7 @@ jobs:
       # so its PVC layer cache is always warm after the first run.
       - name: Set up BuildKit
         id: buildkit
-        uses: ls1intum/theia-arc-runners/.github/actions/buildkit-setup@feat/stateful-buildkit-runners
+        uses: ls1intum/theia-arc-runners/.github/actions/buildkit-setup@main
         with:
           # Set this to the Dockerfile path for this specific image.
           # If your repo builds multiple images from different Dockerfiles, each

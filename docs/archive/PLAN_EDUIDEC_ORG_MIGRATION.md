@@ -16,7 +16,7 @@
 | Resource | theia-prod | parma |
 |----------|------------|-------|
 | Active runner set | `arc-buildkit-eduide-theiaprod-amd64` | `arc-buildkit-eduide-parma-arm64` |
-| BuildKit namespace | `buildkit-exp` | `buildkit` |
+| BuildKit namespace | `buildkit` | `buildkit` |
 | GitHub org URL | `https://github.com/EduIDE` | `https://github.com/EduIDE` |
 | Auth secret | `github-arc-secret-eduidec` | `github-arc-secret-eduidec` |
 
