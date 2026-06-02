@@ -144,9 +144,26 @@ If the Zot pod is stuck in `ContainerCreating` and events show `secret "zot-dock
 
 ```bash
 kubectl --context parma create namespace zot-system --dry-run=client -o yaml | kubectl --context parma apply -f -
+
+export DOCKERHUB_USERNAME="<dockerhub-username>"
+export DOCKERHUB_PAT="<dockerhub-personal-access-token>"
+ZOT_CREDS="$(mktemp)"
+trap 'rm -f "${ZOT_CREDS}"' EXIT
+cat > "${ZOT_CREDS}" <<EOF
+{
+  "registry-1.docker.io": {
+    "username": "${DOCKERHUB_USERNAME}",
+    "password": "${DOCKERHUB_PAT}"
+  },
+  "docker.io": {
+    "username": "${DOCKERHUB_USERNAME}",
+    "password": "${DOCKERHUB_PAT}"
+  }
+}
+EOF
 kubectl --context parma create secret generic zot-dockerhub-credentials \
   --namespace=zot-system \
-  --from-file=credentials.json=<path-to-dockerhub-credentials.json> \
+  --from-file=credentials.json="${ZOT_CREDS}" \
   --dry-run=client -o yaml | kubectl --context parma apply -f -
 ```
 

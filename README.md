@@ -254,9 +254,26 @@ The current shared Zot deployment runs on `parma` and is consumed by all runner 
 kubectl config use-context parma
 
 kubectl create namespace zot-system --dry-run=client -o yaml | kubectl apply -f -
+
+export DOCKERHUB_USERNAME="<dockerhub-username>"
+export DOCKERHUB_PAT="<dockerhub-personal-access-token>"
+ZOT_CREDS="$(mktemp)"
+trap 'rm -f "${ZOT_CREDS}"' EXIT
+cat > "${ZOT_CREDS}" <<EOF
+{
+  "registry-1.docker.io": {
+    "username": "${DOCKERHUB_USERNAME}",
+    "password": "${DOCKERHUB_PAT}"
+  },
+  "docker.io": {
+    "username": "${DOCKERHUB_USERNAME}",
+    "password": "${DOCKERHUB_PAT}"
+  }
+}
+EOF
 kubectl create secret generic zot-dockerhub-credentials \
   --namespace=zot-system \
-  --from-file=credentials.json=<path-to-dockerhub-credentials.json> \
+  --from-file=credentials.json="${ZOT_CREDS}" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 cd helm-chart/theia-zot
@@ -267,7 +284,7 @@ helm upgrade --install theia-zot . \
   --wait --timeout 10m
 ```
 
-`zot-dockerhub-credentials` must exist before the Helm install because the Zot config mounts `/etc/zot-credentials/credentials.json` as the Docker Hub sync credentials file. The file is sensitive and is not stored in this repository.
+`zot-dockerhub-credentials` must exist before the Helm install because the Zot config mounts `/etc/zot-credentials/credentials.json` as the Docker Hub sync credentials file. Use a Docker Hub personal access token as `DOCKERHUB_PAT`; do not store the token or generated JSON file in this repository.
 
 ### Verify
 
