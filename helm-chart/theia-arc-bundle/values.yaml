@@ -32,6 +32,7 @@ ghaArcScaleSetAmdEduide:
     name: theia-arc-systems-gha-rs-controller
   buildkit:
     namespace: buildkit
+    # Must match the BuildKit StatefulSet replica count for the target cluster.
     numWorkers: 7
   template:
     spec:
@@ -110,6 +111,7 @@ ghaArcScaleSetAmdLs1intum:
     name: theia-arc-systems-gha-rs-controller
   buildkit:
     namespace: buildkit
+    # Must match the BuildKit StatefulSet replica count for the target cluster.
     numWorkers: 7
   template:
     spec:
@@ -186,6 +188,7 @@ ghaArcScaleSetArmEduide:
     name: theia-arc-systems-gha-rs-controller
   buildkit:
     namespace: buildkit
+    # Must match the BuildKit StatefulSet replica count for the target cluster.
     numWorkers: 7
   template:
     spec:
@@ -262,6 +265,7 @@ ghaArcScaleSetArmLs1intum:
     name: theia-arc-systems-gha-rs-controller
   buildkit:
     namespace: buildkit
+    # Must match the BuildKit StatefulSet replica count for the target cluster.
     numWorkers: 7
   template:
     spec:

@@ -245,8 +245,10 @@ Three deployable releases/components are used:
 
 **Build execution:** GitHub jobs run on ARC runners with DinD + runner containers. Docker builds are routed by workflow logic to stateful BuildKit workers:
 
-- stud/theia-prod workers: namespace `buildkit` (`csi-rbd-sc`, 7 replicas)
-- parma workers: namespace `buildkit` (`longhorn`, 7 replicas)
+- stud/theia-prod workers: namespace `buildkit` (`csi-rbd-sc`, currently 7 replicas)
+- parma workers: namespace `buildkit` (`longhorn`, currently 7 replicas)
+
+The 7-worker count is arbitrary. One BuildKit worker can handle multiple builds at once. On multi-node clusters, scale the StatefulSet replicas and matching runner `BUILDKIT_NUM_WORKERS` value together; one worker per node is reasonable if capacity exists. The pod anti-affinity is soft, so workers prefer separate nodes but can still co-locate. Be conservative on parma because it is currently a single-node cluster.
 
 ---
 
@@ -284,5 +286,6 @@ Three deployable releases/components are used:
 - The old self-hosted actions cache subchart has been removed from the active bundle.
 - Runner pods use the official `ghcr.io/actions/actions-runner:latest` image.
 - BuildKit workers are separate StatefulSet pods so Docker layer cache, BuildKit cache layers, and cache mounts persist outside disposable runner pods.
+- Keep BuildKit StatefulSet `replicas` and chart `buildkit.numWorkers` in sync.
 - Keep docs aligned with manifests; when mismatched, trust `values.yaml`, `values-<cluster>.yaml`, and `infra/**` YAML.
 - Zot startup can fail on low inotify settings (`failed to create a new hot reloader`); raise node inotify limits and restart pod.

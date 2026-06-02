@@ -10,6 +10,9 @@ metadata:
 spec:
   serviceName: buildkitd
   podManagementPolicy: Parallel
+  # Current baseline. Scale with helm-chart/theia-arc-bundle buildkit.numWorkers.
+  # Workers use soft anti-affinity and can handle multiple builds each.
+  # Be conservative on parma while it is a single-node cluster.
   replicas: 7
   selector:
     matchLabels:

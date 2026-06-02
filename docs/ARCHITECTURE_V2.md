@@ -109,7 +109,7 @@ The chart is deployed in **two separate Helm releases** because Helm 3 cannot de
 | Zot PVC | `zot-system` | 100Gi | `longhorn` |
 | BuildKit worker PVCs | `buildkit` on every runner cluster | 7 x 100Gi per cluster | `csi-rbd-sc` on stud/theia-prod, `longhorn` on parma |
 
-BuildKit StatefulSets use soft pod anti-affinity across `kubernetes.io/hostname`: workers prefer different nodes, but scheduling can still proceed if the cluster cannot spread all replicas.
+The current 7 BuildKit workers per cluster are an arbitrary operational baseline, not a hard architectural limit. One BuildKit worker can handle multiple builds at once. On multi-node clusters, especially if stud grows, the worker count can be increased and may reasonably move toward one worker per node. BuildKit StatefulSets use soft pod anti-affinity across `kubernetes.io/hostname`: workers prefer different nodes, but scheduling can still proceed if the cluster cannot spread all replicas. Be conservative on parma because it is currently a single-node cluster.
 
 ## Verification
 
