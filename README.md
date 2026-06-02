@@ -37,7 +37,7 @@ Zot is deployed as a standalone release on parma:
 
 - release: `theia-zot`
 - namespace: `zot-system`
-- storage: Longhorn PVC (250Gi)
+- storage: Longhorn PVC (100Gi)
 - service: NodePort `30081`
 
 Runner DinD containers are configured with:
@@ -256,5 +256,5 @@ Expected runner sets:
 helm uninstall theia-arc-runners -n arc-runners
 helm uninstall theia-arc-systems -n arc-systems
 helm uninstall theia-zot -n zot-system
-kubectl delete namespace arc-runners arc-systems zot-system buildkit buildkit --ignore-not-found=true
+kubectl delete namespace arc-runners arc-systems zot-system buildkit --ignore-not-found=true
 ```

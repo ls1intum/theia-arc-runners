@@ -20,7 +20,7 @@ ghaArcController:
 
 # AMD64 BuildKit runner set that routes docker builds to stateful BuildKit workers.
 # BuildKit workers live in the buildkit namespace (raw manifests).
-# Workflows opt in explicitly with: runs-on: arc-buildkit-eduide-theiaprod-amd64
+# Cluster overlays set the final runner label, e.g. stud or theia-prod.
 ghaArcScaleSetAmdEduide:
   enabled: false
   githubConfigUrl: "https://github.com/EduIDE"
@@ -174,7 +174,7 @@ ghaArcScaleSetAmdLs1intum:
 
 # ARM64 BuildKit runner set for parma.
 # Routes docker builds to stateful BuildKit workers in the buildkit namespace.
-# Workflows opt in explicitly with: runs-on: arc-buildkit-eduide-parma-arm64
+# Cluster overlays set the final runner label.
 ghaArcScaleSetArmEduide:
   enabled: false
   githubConfigUrl: "https://github.com/EduIDE"
@@ -325,13 +325,5 @@ ghaArcScaleSetArmLs1intum:
           emptyDir: {}
         - name: dind-externals
           emptyDir: {}
-
-externalSecrets:
-  enabled: false
-  secretStore: "vault-backend"
-  githubPat:
-    remoteRef:
-      key: "github/actions-pat"
-      property: "token"
 
 # Zot is deployed via standalone `theia-zot` chart in `zot-system`.

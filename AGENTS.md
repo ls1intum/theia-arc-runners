@@ -7,7 +7,7 @@ Guidance for AI coding agents working in this repository.
 **Pure infrastructure-as-code** repository. No application code and no application-level test suite.
 The stack is: Helm 3 umbrella chart + Kubernetes YAML + GitHub Actions workflows.
 
-**Two target clusters:**
+**Three target clusters:**
 
 | Cluster | Context | Arch | Active BuildKit runner sets |
 |---------|---------|------|-----------------------------|
@@ -157,15 +157,23 @@ kubectl get autoscalingrunnersets -n arc-runners
 kubectl get pvc -n zot-system
 
 # BuildKit workers
+kubectl get pods -n buildkit   # stud
 kubectl get pods -n buildkit   # theia-prod
-kubectl get pods -n buildkit       # parma
+kubectl get pods -n buildkit   # parma
 ```
 
 ### Helm Lint / Template Validation (local)
 
 ```bash
-helm lint helm-chart/theia-arc-bundle/
-helm template helm-chart/theia-arc-bundle/ | kubectl apply --dry-run=client -f -
+helm lint helm-chart/theia-arc-bundle/ \
+  -f helm-chart/theia-arc-bundle/values.yaml \
+  -f helm-chart/theia-arc-bundle/values-stud.yaml
+helm lint helm-chart/theia-arc-bundle/ \
+  -f helm-chart/theia-arc-bundle/values.yaml \
+  -f helm-chart/theia-arc-bundle/values-theia-prod.yaml
+helm lint helm-chart/theia-arc-bundle/ \
+  -f helm-chart/theia-arc-bundle/values.yaml \
+  -f helm-chart/theia-arc-bundle/values-parma.yaml
 
 helm lint helm-chart/theia-zot/
 helm template helm-chart/theia-zot/ | kubectl apply --dry-run=client -f -
@@ -177,7 +185,7 @@ helm template helm-chart/theia-zot/ | kubectl apply --dry-run=client -f -
 helm uninstall theia-arc-runners -n arc-runners
 helm uninstall theia-arc-systems -n arc-systems
 helm uninstall theia-zot -n zot-system
-kubectl delete namespace arc-runners arc-systems zot-system buildkit buildkit --ignore-not-found=true
+kubectl delete namespace arc-runners arc-systems zot-system buildkit --ignore-not-found=true
 ```
 
 ---
@@ -197,7 +205,6 @@ kubectl delete namespace arc-runners arc-systems zot-system buildkit buildkit --
 │   │   │   ├── _helpers.tpl       # Helm template helpers
 │   │   │   ├── namespace.yaml     # arc-systems / arc-runners namespaces
 │   │   │   ├── rbac.yaml          # ServiceAccounts + Role + RoleBindings
-│   │   │   └── external-secret-github.yaml  # Optional: ExternalSecrets integration
 │   │   └── charts/
 │   │       ├── gha-runner-scale-set-0.14.2.tgz
 │   │       └── gha-runner-scale-set-controller-0.14.2.tgz
@@ -239,10 +246,12 @@ Three deployable releases/components are used:
   - `theia-zot` (Part 3)
 - Namespaces:
   - `arc-systems`, `arc-runners`, `zot-system`
-  - `buildkit` (stud/theia-prod BuildKit), `buildkit` (parma BuildKit)
+  - `buildkit` on every runner cluster
 - Active runner set names:
+  - `arc-buildkit-eduide-stud-amd64`
   - `arc-buildkit-eduide-theiaprod-amd64`
   - `arc-buildkit-eduide-parma-arm64`
+  - `arc-buildkit-ls1intum-stud-amd64`
   - `arc-buildkit-ls1intum-theiaprod-amd64`
   - `arc-buildkit-ls1intum-parma-arm64`
 
@@ -252,7 +261,7 @@ Three deployable releases/components are used:
 
 - **Uninstall order is critical**: remove runners before controller to avoid ARC finalizer deadlocks.
 - `createNamespaces: false` is intentional in the documented flow because namespaces are created before Helm and Part 1 / Part 2 are separate releases.
-- `externalSecrets.enabled: false` by default; auth secrets are managed explicitly.
+- GitHub App auth secrets are managed explicitly; the active chart does not create them.
 - The old self-hosted actions cache subchart has been removed from the active bundle.
 - Runner pods use the official `ghcr.io/actions/actions-runner:latest` image.
 - BuildKit workers are separate StatefulSet pods so Docker layer cache, BuildKit cache layers, and cache mounts persist outside disposable runner pods.

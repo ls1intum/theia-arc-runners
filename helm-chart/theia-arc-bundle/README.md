@@ -151,10 +151,10 @@ Use `values.yaml` plus exactly one cluster overlay:
 | Value | Meaning |
 |------|---------|
 | `ghaArcController.enabled` | Enable ARC controller subchart |
-| `ghaArcScaleSetAmdEduide.enabled` | AMD64 BuildKit runner set (`arc-buildkit-eduide-theiaprod-amd64`) |
-| `ghaArcScaleSetArmEduide.enabled` | ARM64 BuildKit runner set (`arc-buildkit-eduide-parma-arm64`) |
-| `ghaArcScaleSetAmdLs1intum.enabled` | AMD64 BuildKit runner set for ls1intum |
-| `ghaArcScaleSetArmLs1intum.enabled` | ARM64 BuildKit runner set for ls1intum |
+| `ghaArcScaleSetAmdEduide.enabled` | AMD64 BuildKit runner set for EduIDE; final name comes from the cluster overlay |
+| `ghaArcScaleSetAmdLs1intum.enabled` | AMD64 BuildKit runner set for ls1intum; final name comes from the cluster overlay |
+| `ghaArcScaleSetArmEduide.enabled` | ARM64 BuildKit runner set for EduIDE; final name comes from the cluster overlay |
+| `ghaArcScaleSetArmLs1intum.enabled` | ARM64 BuildKit runner set for ls1intum; final name comes from the cluster overlay |
 
 ## Verification
 

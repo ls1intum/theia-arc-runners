@@ -143,11 +143,9 @@ jobs:
         env:
           KUBECONFIG: ${{ github.workspace }}/kubeconfig
           HELM_VALUES: ${{ steps.target.outputs.helm_values }}
-          EDUIDEC_GITHUB_TOKEN: ${{ secrets.EDUIDEC_GITHUB_TOKEN }}
           EDUIDEC_GITHUB_APP_ID: ${{ secrets.EDUIDEC_GITHUB_APP_ID }}
           EDUIDEC_GITHUB_APP_INSTALLATION_ID: ${{ secrets.EDUIDEC_GITHUB_APP_INSTALLATION_ID }}
           EDUIDEC_GITHUB_APP_PRIVATE_KEY: ${{ secrets.EDUIDEC_GITHUB_APP_PRIVATE_KEY }}
-          LS1INTUM_GITHUB_TOKEN: ${{ secrets.LS1INTUM_GITHUB_TOKEN }}
           LS1INTUM_GITHUB_APP_ID: ${{ secrets.LS1INTUM_GITHUB_APP_ID }}
           LS1INTUM_GITHUB_APP_INSTALLATION_ID: ${{ secrets.LS1INTUM_GITHUB_APP_INSTALLATION_ID }}
           LS1INTUM_GITHUB_APP_PRIVATE_KEY: ${{ secrets.LS1INTUM_GITHUB_APP_PRIVATE_KEY }}
@@ -161,18 +159,9 @@ jobs:
 
           create_github_secret() {
             local name="$1"
-            local token="$2"
-            local app_id="$3"
-            local installation_id="$4"
-            local private_key="$5"
-
-            if [[ -n "${token}" ]]; then
-              kubectl create secret generic "${name}" \
-                --namespace arc-runners \
-                --from-literal=github_token="${token}" \
-                --dry-run=client -o yaml | kubectl apply -f -
-              return
-            fi
+            local app_id="$2"
+            local installation_id="$3"
+            local private_key="$4"
 
             if [[ -n "${app_id}" && -n "${installation_id}" && -n "${private_key}" ]]; then
               local key_file
@@ -188,20 +177,18 @@ jobs:
               return
             fi
 
-            echo "::error::Missing credentials for Kubernetes secret ${name}. Provide either *_GITHUB_TOKEN or all GitHub App secrets."
+            echo "::error::Missing GitHub App credentials for Kubernetes secret ${name}. Provide *_GITHUB_APP_ID, *_GITHUB_APP_INSTALLATION_ID, and *_GITHUB_APP_PRIVATE_KEY."
             exit 1
           }
 
           create_github_secret \
             github-arc-secret-eduidec \
-            "${EDUIDEC_GITHUB_TOKEN}" \
             "${EDUIDEC_GITHUB_APP_ID}" \
             "${EDUIDEC_GITHUB_APP_INSTALLATION_ID}" \
             "${EDUIDEC_GITHUB_APP_PRIVATE_KEY}"
 
           create_github_secret \
             github-arc-secret \
-            "${LS1INTUM_GITHUB_TOKEN}" \
             "${LS1INTUM_GITHUB_APP_ID}" \
             "${LS1INTUM_GITHUB_APP_INSTALLATION_ID}" \
             "${LS1INTUM_GITHUB_APP_PRIVATE_KEY}"
