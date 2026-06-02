@@ -34,9 +34,7 @@ All runner clusters reach the current shared Zot deployment on parma via NodePor
 
 The current Zot mirror exists mainly to avoid Docker Hub pull rate limits for anonymous or low-tier authenticated pulls. GitHub Container Registry does not have the same Docker Hub pull-rate-limit pressure for this setup, so the mirror primarily protects Docker Hub traffic.
 
-The current Docker Hub credentials are intentionally treated as burner credentials. If this system starts pulling significantly more Docker Hub images, consider buying a Docker Team plan and using a dedicated Docker Hub user for CI pulls. Docker currently lists Team at $15/user/month on annual billing and $16/user/month on monthly billing. A paid Docker Hub account could be injected into the stateful BuildKit runners directly, letting BuildKit pull from Docker Hub with authenticated pull capacity and potentially removing the need to operate our own Zot mirror.
-
-That tradeoff should be revisited only if pull volume justifies it. Keeping Zot means more infrastructure to maintain, but centralizes Docker Hub caching. Removing Zot reduces maintenance, and the stateful BuildKit workers would still avoid many repeated pulls because their local BuildKit state persists across jobs.
+The longer-term tradeoff between keeping Zot and using a paid Docker Hub CI account is documented in [ZOT_VS_DOCKER_HUB_SUBSCRIPTION.md](ZOT_VS_DOCKER_HUB_SUBSCRIPTION.md).
 
 ### 2. Build cache model
 

@@ -47,7 +47,7 @@ Runner DinD containers are configured with:
 --insecure-registry=131.159.88.117:30081
 ```
 
-Zot primarily exists to avoid Docker Hub pull rate limits. If Docker Hub traffic grows substantially, revisit whether a paid Docker Team account for CI pulls would be simpler than maintaining the mirror. See [ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md).
+Zot primarily exists to avoid Docker Hub pull rate limits. If Docker Hub traffic grows substantially, revisit whether a paid Docker Team account for CI pulls would be simpler than maintaining the mirror. See [ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md) and [ZOT_VS_DOCKER_HUB_SUBSCRIPTION.md](docs/ZOT_VS_DOCKER_HUB_SUBSCRIPTION.md).
 
 ### Runner + BuildKit Model
 
