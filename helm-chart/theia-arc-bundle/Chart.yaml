@@ -12,51 +12,51 @@ maintainers:
     url: https://github.com/ls1intum
 
 dependencies:
-  # External ARC Controller
+  # ARC controller: shared controller release, not tied to one org or architecture.
   - name: gha-runner-scale-set-controller
     version: 0.14.2
     repository: "oci://ghcr.io/actions/actions-runner-controller-charts"
-    alias: arcController
-    condition: arcController.enabled
+    alias: ghaArcController
+    condition: ghaArcController.enabled
 
-  # External ARC Runner Scale Set (AMD64)
+  # ARC scale set: stateless AMD64 runner set for EduIDE. Disabled in the current BuildKit topology.
   - name: gha-runner-scale-set
     version: 0.14.2
     repository: "oci://ghcr.io/actions/actions-runner-controller-charts"
-    alias: arcRunners
-    condition: arcRunners.enabled
+    alias: ghaArcScaleSetStatelessAmdEduide
+    condition: ghaArcScaleSetStatelessAmdEduide.enabled
 
-  # External ARC Runner Scale Set (ARM64)
+  # ARC scale set: stateless ARM64 runner set for EduIDE. Disabled in the current BuildKit topology.
   - name: gha-runner-scale-set
     version: 0.14.2
     repository: "oci://ghcr.io/actions/actions-runner-controller-charts"
-    alias: arcRunnersArm
-    condition: arcRunnersArm.enabled
+    alias: ghaArcScaleSetStatelessArmEduide
+    condition: ghaArcScaleSetStatelessArmEduide.enabled
 
-  # EduIDE AMD64 BuildKit runner set.
+  # ARC scale set: AMD64 BuildKit runner set for EduIDE.
   - name: gha-runner-scale-set
     version: 0.14.2
     repository: "oci://ghcr.io/actions/actions-runner-controller-charts"
-    alias: arcRunnersExp
-    condition: arcRunnersExp.enabled
+    alias: ghaArcScaleSetAmdEduide
+    condition: ghaArcScaleSetAmdEduide.enabled
 
-  # EduIDE ARM64 BuildKit runner set.
+  # ARC scale set: ARM64 BuildKit runner set for EduIDE.
   - name: gha-runner-scale-set
     version: 0.14.2
     repository: "oci://ghcr.io/actions/actions-runner-controller-charts"
-    alias: arcRunnersArmBuildkit
-    condition: arcRunnersArmBuildkit.enabled
+    alias: ghaArcScaleSetArmEduide
+    condition: ghaArcScaleSetArmEduide.enabled
 
-  # ls1intum AMD64 BuildKit runner set.
+  # ARC scale set: AMD64 BuildKit runner set for ls1intum.
   - name: gha-runner-scale-set
     version: 0.14.2
     repository: "oci://ghcr.io/actions/actions-runner-controller-charts"
-    alias: arcRunnersLs1intumExp
-    condition: arcRunnersLs1intumExp.enabled
+    alias: ghaArcScaleSetAmdLs1intum
+    condition: ghaArcScaleSetAmdLs1intum.enabled
 
-  # ls1intum ARM64 BuildKit runner set.
+  # ARC scale set: ARM64 BuildKit runner set for ls1intum.
   - name: gha-runner-scale-set
     version: 0.14.2
     repository: "oci://ghcr.io/actions/actions-runner-controller-charts"
-    alias: arcRunnersLs1intumArmBuildkit
-    condition: arcRunnersLs1intumArmBuildkit.enabled
+    alias: ghaArcScaleSetArmLs1intum
+    condition: ghaArcScaleSetArmLs1intum.enabled

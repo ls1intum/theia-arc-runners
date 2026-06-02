@@ -12,10 +12,19 @@ BuildKit-focused runner sets backed by stateful BuildKit workers and a shared Zo
 | theia-prod | AMD64 | `arc-buildkit-eduide-amd64`, `arc-buildkit-ls1intum-amd64` | `buildkit-exp` | `csi-rbd-sc` | `131.159.88.117:30081` |
 | parma | ARM64 | `arc-buildkit-eduide-arm64`, `arc-buildkit-ls1intum-arm64` | `buildkit` | `longhorn` | `131.159.88.117:30081` |
 
+Use `helm-chart/theia-arc-bundle/values.yaml` plus exactly one cluster overlay:
+
+| Cluster | Values overlay |
+|---------|----------------|
+| stud | `helm-chart/theia-arc-bundle/values-stud.yaml` |
+| theia-prod | `helm-chart/theia-arc-bundle/values-theia-prod.yaml` |
+| parma | `helm-chart/theia-arc-bundle/values-parma.yaml` |
+
 ## Features
 
 - ARC runner sets for EduIDE and ls1intum organization workloads
 - Stateful BuildKit workers (7 replicas per cluster, 100Gi per worker)
+- BuildKit pods prefer spreading across nodes with soft pod anti-affinity
 - Zot pull-through cache for `docker.io` (removes Docker Hub rate-limit pressure)
 - Official ARC runner image (`ghcr.io/actions/actions-runner`) and ARC Helm charts
 - Memory-backed work volume on parma runners (`emptyDir.medium: Memory`, 30Gi)
@@ -101,28 +110,30 @@ kubectl rollout status statefulset/buildkitd -n buildkit-exp --timeout=10m
 # Part 1: Controller
 helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   --namespace arc-systems \
+  -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-stud.yaml \
   --set createNamespaces=false \
-  --set arcRunners.enabled=false \
-  --set arcRunnersArm.enabled=false \
-  --set arcRunnersExp.enabled=false \
-  --set arcRunnersArmBuildkit.enabled=false \
-  --set arcRunnersLs1intumExp.enabled=false \
-  --set arcRunnersLs1intumArmBuildkit.enabled=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=false \
+  --set ghaArcScaleSetArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdLs1intum.enabled=false \
+  --set ghaArcScaleSetArmLs1intum.enabled=false \
   --wait --timeout 5m
 
 # Part 2: AMD64 BuildKit runner sets for EduIDE and ls1intum
 helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   --namespace arc-runners \
+  -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-stud.yaml \
   --set createNamespaces=false \
-  --set arcController.enabled=false \
-  --set arcRunners.enabled=false \
-  --set arcRunnersArm.enabled=false \
-  --set arcRunnersExp.enabled=true \
-  --set arcRunnersArmBuildkit.enabled=false \
-  --set arcRunnersLs1intumExp.enabled=true \
-  --set arcRunnersLs1intumArmBuildkit.enabled=false \
+  --set ghaArcController.enabled=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=true \
+  --set ghaArcScaleSetArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdLs1intum.enabled=true \
+  --set ghaArcScaleSetArmLs1intum.enabled=false \
   --wait --timeout 10m
 ```
 
@@ -142,26 +153,30 @@ kubectl rollout status statefulset/buildkitd -n buildkit-exp --timeout=10m
 # Part 1: Controller
 helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   --namespace arc-systems \
+  -f helm-chart/theia-arc-bundle/values.yaml \
+  -f helm-chart/theia-arc-bundle/values-theia-prod.yaml \
   --set createNamespaces=false \
-  --set arcRunners.enabled=false \
-  --set arcRunnersArm.enabled=false \
-  --set arcRunnersExp.enabled=false \
-  --set arcRunnersArmBuildkit.enabled=false \
-  --set arcRunnersLs1intumExp.enabled=false \
-  --set arcRunnersLs1intumArmBuildkit.enabled=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=false \
+  --set ghaArcScaleSetArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdLs1intum.enabled=false \
+  --set ghaArcScaleSetArmLs1intum.enabled=false \
   --wait --timeout 5m
 
 # Part 2: AMD64 BuildKit runner sets for EduIDE and ls1intum
 helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   --namespace arc-runners \
+  -f helm-chart/theia-arc-bundle/values.yaml \
+  -f helm-chart/theia-arc-bundle/values-theia-prod.yaml \
   --set createNamespaces=false \
-  --set arcController.enabled=false \
-  --set arcRunners.enabled=false \
-  --set arcRunnersArm.enabled=false \
-  --set arcRunnersExp.enabled=true \
-  --set arcRunnersArmBuildkit.enabled=false \
-  --set arcRunnersLs1intumExp.enabled=true \
-  --set arcRunnersLs1intumArmBuildkit.enabled=false \
+  --set ghaArcController.enabled=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=true \
+  --set ghaArcScaleSetArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdLs1intum.enabled=true \
+  --set ghaArcScaleSetArmLs1intum.enabled=false \
   --wait --timeout 10m
 ```
 
@@ -181,28 +196,30 @@ kubectl rollout status statefulset/buildkitd -n buildkit --timeout=10m
 # Part 1: Controller
 helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   --namespace arc-systems \
-  -f helm-chart/theia-arc-bundle/values-arm64.yaml \
+  -f helm-chart/theia-arc-bundle/values.yaml \
+  -f helm-chart/theia-arc-bundle/values-parma.yaml \
   --set createNamespaces=false \
-  --set arcRunners.enabled=false \
-  --set arcRunnersArm.enabled=false \
-  --set arcRunnersExp.enabled=false \
-  --set arcRunnersArmBuildkit.enabled=false \
-  --set arcRunnersLs1intumExp.enabled=false \
-  --set arcRunnersLs1intumArmBuildkit.enabled=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=false \
+  --set ghaArcScaleSetArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdLs1intum.enabled=false \
+  --set ghaArcScaleSetArmLs1intum.enabled=false \
   --wait --timeout 5m
 
 # Part 2: ARM64 BuildKit runner sets for EduIDE and ls1intum
 helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   --namespace arc-runners \
-  -f helm-chart/theia-arc-bundle/values-arm64.yaml \
+  -f helm-chart/theia-arc-bundle/values.yaml \
+  -f helm-chart/theia-arc-bundle/values-parma.yaml \
   --set createNamespaces=false \
-  --set arcController.enabled=false \
-  --set arcRunners.enabled=false \
-  --set arcRunnersArm.enabled=false \
-  --set arcRunnersExp.enabled=false \
-  --set arcRunnersArmBuildkit.enabled=true \
-  --set arcRunnersLs1intumExp.enabled=false \
-  --set arcRunnersLs1intumArmBuildkit.enabled=true \
+  --set ghaArcController.enabled=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=false \
+  --set ghaArcScaleSetArmEduide.enabled=true \
+  --set ghaArcScaleSetAmdLs1intum.enabled=false \
+  --set ghaArcScaleSetArmLs1intum.enabled=true \
   --wait --timeout 10m
 ```
 

@@ -25,29 +25,46 @@ The stack is: Helm 3 umbrella chart + Kubernetes YAML + GitHub Actions workflows
 kubectl create namespace arc-systems --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace arc-runners --dry-run=client -o yaml | kubectl apply -f -
 
-# AMD64 (stud or theia-prod)
+# stud (AMD64)
 helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   --namespace arc-systems \
+  -f helm-chart/theia-arc-bundle/values.yaml \
+  -f helm-chart/theia-arc-bundle/values-stud.yaml \
   --set createNamespaces=false \
-  --set arcRunners.enabled=false \
-  --set arcRunnersArm.enabled=false \
-  --set arcRunnersExp.enabled=false \
-  --set arcRunnersArmBuildkit.enabled=false \
-  --set arcRunnersLs1intumExp.enabled=false \
-  --set arcRunnersLs1intumArmBuildkit.enabled=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=false \
+  --set ghaArcScaleSetArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdLs1intum.enabled=false \
+  --set ghaArcScaleSetArmLs1intum.enabled=false \
   --wait --timeout 5m
 
-# ARM64 (parma) — overlay values-arm64.yaml on top of values.yaml
+# theia-prod (AMD64)
 helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   --namespace arc-systems \
-  -f helm-chart/theia-arc-bundle/values-arm64.yaml \
+  -f helm-chart/theia-arc-bundle/values.yaml \
+  -f helm-chart/theia-arc-bundle/values-theia-prod.yaml \
   --set createNamespaces=false \
-  --set arcRunners.enabled=false \
-  --set arcRunnersArm.enabled=false \
-  --set arcRunnersExp.enabled=false \
-  --set arcRunnersArmBuildkit.enabled=false \
-  --set arcRunnersLs1intumExp.enabled=false \
-  --set arcRunnersLs1intumArmBuildkit.enabled=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=false \
+  --set ghaArcScaleSetArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdLs1intum.enabled=false \
+  --set ghaArcScaleSetArmLs1intum.enabled=false \
+  --wait --timeout 5m
+
+# parma (ARM64)
+helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
+  --namespace arc-systems \
+  -f helm-chart/theia-arc-bundle/values.yaml \
+  -f helm-chart/theia-arc-bundle/values-parma.yaml \
+  --set createNamespaces=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=false \
+  --set ghaArcScaleSetArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdLs1intum.enabled=false \
+  --set ghaArcScaleSetArmLs1intum.enabled=false \
   --wait --timeout 5m
 ```
 
@@ -82,31 +99,49 @@ kubectl rollout status statefulset/buildkitd -n buildkit --timeout=10m
 ### Helm — Deploy Part 2 (BuildKit Runner Sets)
 
 ```bash
-# AMD64 BuildKit runner sets on stud/theia-prod
+# stud AMD64 BuildKit runner sets
 helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   --namespace arc-runners \
+  -f helm-chart/theia-arc-bundle/values.yaml \
+  -f helm-chart/theia-arc-bundle/values-stud.yaml \
   --set createNamespaces=false \
-  --set arcController.enabled=false \
-  --set arcRunners.enabled=false \
-  --set arcRunnersArm.enabled=false \
-  --set arcRunnersExp.enabled=true \
-  --set arcRunnersArmBuildkit.enabled=false \
-  --set arcRunnersLs1intumExp.enabled=true \
-  --set arcRunnersLs1intumArmBuildkit.enabled=false \
+  --set ghaArcController.enabled=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=true \
+  --set ghaArcScaleSetArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdLs1intum.enabled=true \
+  --set ghaArcScaleSetArmLs1intum.enabled=false \
   --wait --timeout 10m
 
-# ARM64 BuildKit runner sets on parma
+# theia-prod AMD64 BuildKit runner sets
 helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   --namespace arc-runners \
-  -f helm-chart/theia-arc-bundle/values-arm64.yaml \
+  -f helm-chart/theia-arc-bundle/values.yaml \
+  -f helm-chart/theia-arc-bundle/values-theia-prod.yaml \
   --set createNamespaces=false \
-  --set arcController.enabled=false \
-  --set arcRunners.enabled=false \
-  --set arcRunnersArm.enabled=false \
-  --set arcRunnersExp.enabled=false \
-  --set arcRunnersArmBuildkit.enabled=true \
-  --set arcRunnersLs1intumExp.enabled=false \
-  --set arcRunnersLs1intumArmBuildkit.enabled=true \
+  --set ghaArcController.enabled=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=true \
+  --set ghaArcScaleSetArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdLs1intum.enabled=true \
+  --set ghaArcScaleSetArmLs1intum.enabled=false \
+  --wait --timeout 10m
+
+# parma ARM64 BuildKit runner sets
+helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
+  --namespace arc-runners \
+  -f helm-chart/theia-arc-bundle/values.yaml \
+  -f helm-chart/theia-arc-bundle/values-parma.yaml \
+  --set createNamespaces=false \
+  --set ghaArcController.enabled=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=false \
+  --set ghaArcScaleSetArmEduide.enabled=true \
+  --set ghaArcScaleSetAmdLs1intum.enabled=false \
+  --set ghaArcScaleSetArmLs1intum.enabled=true \
   --wait --timeout 10m
 ```
 
@@ -163,8 +198,10 @@ kubectl delete namespace arc-runners arc-systems zot-system buildkit buildkit-ex
 ├── helm-chart/
 │   ├── theia-arc-bundle/          # Umbrella Helm chart (controller/runner sets)
 │   │   ├── Chart.yaml             # Chart metadata + dependencies
-│   │   ├── values.yaml            # AMD64 defaults (theia-prod)
-│   │   ├── values-arm64.yaml      # ARM64 overrides (parma)
+│   │   ├── values.yaml            # shared defaults; no production scale set enabled by itself
+│   │   ├── values-stud.yaml       # stud AMD64 runner scale sets
+│   │   ├── values-theia-prod.yaml # theia-prod AMD64 runner scale sets
+│   │   ├── values-parma.yaml      # parma ARM64 runner scale sets
 │   │   ├── templates/
 │   │   │   ├── _helpers.tpl       # Helm template helpers
 │   │   │   ├── namespace.yaml     # arc-systems / arc-runners namespaces
@@ -227,5 +264,5 @@ Three deployable releases/components are used:
 - `externalSecrets.enabled: false` by default; auth secrets are managed explicitly.
 - The old self-hosted actions cache subchart has been removed from the active bundle.
 - Runner pods use the official `ghcr.io/actions/actions-runner:latest` image.
-- Keep docs aligned with manifests; when mismatched, trust `values.yaml`, `values-arm64.yaml`, and `infra/**` YAML.
+- Keep docs aligned with manifests; when mismatched, trust `values.yaml`, `values-<cluster>.yaml`, and `infra/**` YAML.
 - Zot startup can fail on low inotify settings (`failed to create a new hot reloader`); raise node inotify limits and restart pod.

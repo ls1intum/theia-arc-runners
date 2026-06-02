@@ -30,17 +30,17 @@ Key choices:
 Updated:
 
 - `helm-chart/theia-arc-bundle/Chart.yaml`
-  - Added dependency alias: `arcRunnersArmBuildkit`
+  - Added dependency alias: `ghaArcScaleSetArmEduide`
 - `helm-chart/theia-arc-bundle/values.yaml`
-  - Added full `arcRunnersArmBuildkit` block
+  - Added full `ghaArcScaleSetArmEduide` block
   - Runner scale set name: `arc-buildkit-eduide-arm64`
   - Added env vars for workflow routing:
     - `BUILDKIT_NAMESPACE=buildkit`
     - `BUILDKIT_NUM_WORKERS=7`
-- `helm-chart/theia-arc-bundle/values-arm64.yaml`
-  - Enabled: `arcRunnersArmBuildkit.enabled: true`
+- `helm-chart/theia-arc-bundle/values-parma.yaml`
+  - Enabled: `ghaArcScaleSetArmEduide.enabled: true`
 - `helm-chart/theia-arc-bundle/templates/rbac.yaml`
-  - Extended condition so RBAC renders when `arcRunnersExp` or `arcRunnersArmBuildkit` is enabled
+  - Extended condition so RBAC renders when `ghaArcScaleSetAmdEduide` or `ghaArcScaleSetArmEduide` is enabled
 - `helm-chart/theia-arc-bundle/templates/namespace.yaml`
   - Extended `arc-runners` namespace condition for same flags
 
@@ -49,7 +49,7 @@ Updated:
 ### Static/chart validation
 
 1. `helm lint helm-chart/theia-arc-bundle` → success
-2. `helm template ... -f values.yaml -f values-arm64.yaml | kubectl apply --dry-run=client -f -` → success
+2. `helm template ... -f values.yaml -f values-parma.yaml | kubectl apply --dry-run=client -f -` → success
 3. `kubectl apply --dry-run=client -f infra/parma/buildkit/*.yaml` → success
 
 ### Deployment
@@ -69,10 +69,10 @@ Upgraded runner release (parma context):
 helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   --namespace arc-runners --kube-context parma \
   -f helm-chart/theia-arc-bundle/values.yaml \
-  -f helm-chart/theia-arc-bundle/values-arm64.yaml \
-  --set arcController.enabled=false \
-  --set arcRunnersArm.enabled=false \
-  --set arcRunnersArmBuildkit.enabled=true \
+  -f helm-chart/theia-arc-bundle/values-parma.yaml \
+  --set ghaArcController.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetArmEduide.enabled=true \
   --wait --timeout 10m
 ```
 

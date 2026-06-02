@@ -1,5 +1,5 @@
-# ARM64-specific overrides for parma cluster.
-# Usage: helm upgrade ... -f values.yaml -f values-arm64.yaml
+# Cluster-specific values for parma.
+# Purpose: ARM64 BuildKit runner scale sets for EduIDE and ls1intum.
 
 global:
   storageClass: "longhorn"
@@ -10,20 +10,20 @@ global:
 # Set to false to avoid Helm SSA ownership conflicts on upgrade.
 createNamespaces: false
 
-arcRunners:
+ghaArcScaleSetStatelessAmdEduide:
   enabled: false
 
-arcRunnersArm:
+ghaArcScaleSetStatelessArmEduide:
   enabled: false
 
-arcRunnersExp:
+ghaArcScaleSetAmdEduide:
   enabled: false
 
-arcRunnersLs1intumExp:
+ghaArcScaleSetAmdLs1intum:
   enabled: false
 
-arcRunnersArmBuildkit:
+ghaArcScaleSetArmEduide:
   enabled: true
 
-arcRunnersLs1intumArmBuildkit:
+ghaArcScaleSetArmLs1intum:
   enabled: true

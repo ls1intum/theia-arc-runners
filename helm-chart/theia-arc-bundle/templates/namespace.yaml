@@ -1,4 +1,4 @@
-{{- if and .Values.arcController.enabled .Values.createNamespaces }}
+{{- if and .Values.ghaArcController.enabled .Values.createNamespaces }}
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -6,7 +6,7 @@ metadata:
   labels:
     {{- include "theia-arc-bundle.labels" . | nindent 4 }}
 {{- end }}
-{{- if and (or .Values.arcRunners.enabled .Values.arcRunnersArm.enabled .Values.arcRunnersExp.enabled .Values.arcRunnersArmBuildkit.enabled .Values.arcRunnersLs1intumExp.enabled .Values.arcRunnersLs1intumArmBuildkit.enabled) .Values.createNamespaces }}
+{{- if and (or .Values.ghaArcScaleSetStatelessAmdEduide.enabled .Values.ghaArcScaleSetStatelessArmEduide.enabled .Values.ghaArcScaleSetAmdEduide.enabled .Values.ghaArcScaleSetArmEduide.enabled .Values.ghaArcScaleSetAmdLs1intum.enabled .Values.ghaArcScaleSetArmLs1intum.enabled) .Values.createNamespaces }}
 ---
 apiVersion: v1
 kind: Namespace

@@ -1,3 +1,12 @@
+# Shared defaults for all clusters. Apply exactly one cluster overlay on top:
+# - values-stud.yaml
+# - values-theia-prod.yaml
+# - values-parma.yaml
+#
+# Cluster overlays select storage, architecture, and the active runner scale
+# sets. Keep all scale sets disabled here so a base-only render cannot
+# accidentally register production runners.
+
 global:
   storageClass: "csi-rbd-sc"
   nodeSelector:
@@ -6,10 +15,10 @@ global:
 
 createNamespaces: true
 
-arcController:
+ghaArcController:
   enabled: true
 
-arcRunners:
+ghaArcScaleSetStatelessAmdEduide:
   enabled: false
   githubConfigUrl: "https://github.com/EduIDE"
   githubConfigSecret: "github-arc-secret-eduidec"
@@ -78,7 +87,7 @@ arcRunners:
         - name: dind-externals
           emptyDir: {}
 
-arcRunnersArm:
+ghaArcScaleSetStatelessArmEduide:
   enabled: false
   githubConfigUrl: "https://github.com/EduIDE"
   githubConfigSecret: "github-arc-secret-eduidec"
@@ -151,8 +160,8 @@ arcRunnersArm:
 # AMD64 BuildKit runner set that routes docker builds to stateful BuildKit workers.
 # BuildKit workers live in the buildkit-exp namespace (raw manifests).
 # Workflows opt in explicitly with: runs-on: arc-buildkit-eduide-amd64
-arcRunnersExp:
-  enabled: true
+ghaArcScaleSetAmdEduide:
+  enabled: false
   githubConfigUrl: "https://github.com/EduIDE"
   githubConfigSecret: "github-arc-secret-eduidec"
   minRunners: 10
@@ -229,8 +238,8 @@ arcRunnersExp:
 # ls1intum AMD64 BuildKit runner set.
 # Uses the same AMD64 BuildKit worker pool as EduIDE, but registers against a
 # separate GitHub organization and secret.
-arcRunnersLs1intumExp:
-  enabled: true
+ghaArcScaleSetAmdLs1intum:
+  enabled: false
   githubConfigUrl: "https://github.com/ls1intum"
   githubConfigSecret: "github-arc-secret"
   minRunners: 10
@@ -305,7 +314,7 @@ arcRunnersLs1intumExp:
 # ARM64 BuildKit runner set for parma.
 # Routes docker builds to stateful BuildKit workers in the buildkit namespace.
 # Workflows opt in explicitly with: runs-on: arc-buildkit-eduide-arm64
-arcRunnersArmBuildkit:
+ghaArcScaleSetArmEduide:
   enabled: false
   githubConfigUrl: "https://github.com/EduIDE"
   githubConfigSecret: "github-arc-secret-eduidec"
@@ -381,7 +390,7 @@ arcRunnersArmBuildkit:
           emptyDir: {}
 
 # ls1intum ARM64 BuildKit runner set for parma.
-arcRunnersLs1intumArmBuildkit:
+ghaArcScaleSetArmLs1intum:
   enabled: false
   githubConfigUrl: "https://github.com/ls1intum"
   githubConfigSecret: "github-arc-secret"

@@ -1,8 +1,5 @@
-# Cluster-specific values for stud.
+# Cluster-specific values for theia-prod.
 # Purpose: AMD64 BuildKit runner scale sets for EduIDE and ls1intum.
-#
-# stud runs in parallel to theia-prod during migration, so runner scale set
-# names must be distinct to avoid GitHub ARC listener session conflicts.
 
 global:
   storageClass: "csi-rbd-sc"
@@ -19,11 +16,11 @@ ghaArcScaleSetStatelessArmEduide:
 
 ghaArcScaleSetAmdEduide:
   enabled: true
-  runnerScaleSetName: "arc-buildkit-eduide-stud-amd64"
+  runnerScaleSetName: "arc-buildkit-eduide-amd64"
 
 ghaArcScaleSetAmdLs1intum:
   enabled: true
-  runnerScaleSetName: "arc-buildkit-ls1intum-stud-amd64"
+  runnerScaleSetName: "arc-buildkit-ls1intum-amd64"
 
 ghaArcScaleSetArmEduide:
   enabled: false

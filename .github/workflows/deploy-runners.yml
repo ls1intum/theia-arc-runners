@@ -96,12 +96,12 @@ jobs:
               ;;
             theia-prod)
               echo "buildkit_path=infra/theia-prod/buildkit-exp" >> "${GITHUB_OUTPUT}"
-              echo "helm_values=helm-chart/theia-arc-bundle/values.yaml" >> "${GITHUB_OUTPUT}"
+              echo "helm_values=helm-chart/theia-arc-bundle/values.yaml -f helm-chart/theia-arc-bundle/values-theia-prod.yaml" >> "${GITHUB_OUTPUT}"
               echo "buildkit_namespace=buildkit-exp" >> "${GITHUB_OUTPUT}"
               ;;
             parma)
               echo "buildkit_path=infra/parma/buildkit" >> "${GITHUB_OUTPUT}"
-              echo "helm_values=helm-chart/theia-arc-bundle/values.yaml -f helm-chart/theia-arc-bundle/values-arm64.yaml" >> "${GITHUB_OUTPUT}"
+              echo "helm_values=helm-chart/theia-arc-bundle/values.yaml -f helm-chart/theia-arc-bundle/values-parma.yaml" >> "${GITHUB_OUTPUT}"
               echo "buildkit_namespace=buildkit" >> "${GITHUB_OUTPUT}"
               ;;
             *)
@@ -213,13 +213,13 @@ jobs:
             --namespace arc-systems \
             -f ${HELM_VALUES} \
             --set createNamespaces=false \
-            --set arcController.enabled=true \
-            --set arcRunners.enabled=false \
-            --set arcRunnersArm.enabled=false \
-            --set arcRunnersExp.enabled=false \
-            --set arcRunnersArmBuildkit.enabled=false \
-            --set arcRunnersLs1intumExp.enabled=false \
-            --set arcRunnersLs1intumArmBuildkit.enabled=false \
+            --set ghaArcController.enabled=true \
+            --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+            --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+            --set ghaArcScaleSetAmdEduide.enabled=false \
+            --set ghaArcScaleSetArmEduide.enabled=false \
+            --set ghaArcScaleSetAmdLs1intum.enabled=false \
+            --set ghaArcScaleSetArmLs1intum.enabled=false \
             --wait
 
           helm upgrade --install theia-arc-runners \
@@ -227,7 +227,7 @@ jobs:
             --namespace arc-runners \
             -f ${HELM_VALUES} \
             --set createNamespaces=false \
-            --set arcController.enabled=false \
+            --set ghaArcController.enabled=false \
             --wait
 
       - name: Verify deployment

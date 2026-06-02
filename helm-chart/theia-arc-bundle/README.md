@@ -54,27 +54,29 @@ Run from the repository root.
 ```bash
 helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   --namespace arc-systems \
+  -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-stud.yaml \
   --set createNamespaces=false \
-  --set arcRunners.enabled=false \
-  --set arcRunnersArm.enabled=false \
-  --set arcRunnersExp.enabled=false \
-  --set arcRunnersArmBuildkit.enabled=false \
-  --set arcRunnersLs1intumExp.enabled=false \
-  --set arcRunnersLs1intumArmBuildkit.enabled=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=false \
+  --set ghaArcScaleSetArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdLs1intum.enabled=false \
+  --set ghaArcScaleSetArmLs1intum.enabled=false \
   --wait --timeout 5m
 
 helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   --namespace arc-runners \
+  -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-stud.yaml \
   --set createNamespaces=false \
-  --set arcController.enabled=false \
-  --set arcRunners.enabled=false \
-  --set arcRunnersArm.enabled=false \
-  --set arcRunnersExp.enabled=true \
-  --set arcRunnersArmBuildkit.enabled=false \
-  --set arcRunnersLs1intumExp.enabled=true \
-  --set arcRunnersLs1intumArmBuildkit.enabled=false \
+  --set ghaArcController.enabled=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=true \
+  --set ghaArcScaleSetArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdLs1intum.enabled=true \
+  --set ghaArcScaleSetArmLs1intum.enabled=false \
   --wait --timeout 10m
 ```
 
@@ -83,25 +85,29 @@ helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
 ```bash
 helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   --namespace arc-systems \
+  -f helm-chart/theia-arc-bundle/values.yaml \
+  -f helm-chart/theia-arc-bundle/values-theia-prod.yaml \
   --set createNamespaces=false \
-  --set arcRunners.enabled=false \
-  --set arcRunnersArm.enabled=false \
-  --set arcRunnersExp.enabled=false \
-  --set arcRunnersArmBuildkit.enabled=false \
-  --set arcRunnersLs1intumExp.enabled=false \
-  --set arcRunnersLs1intumArmBuildkit.enabled=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=false \
+  --set ghaArcScaleSetArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdLs1intum.enabled=false \
+  --set ghaArcScaleSetArmLs1intum.enabled=false \
   --wait --timeout 5m
 
 helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   --namespace arc-runners \
+  -f helm-chart/theia-arc-bundle/values.yaml \
+  -f helm-chart/theia-arc-bundle/values-theia-prod.yaml \
   --set createNamespaces=false \
-  --set arcController.enabled=false \
-  --set arcRunners.enabled=false \
-  --set arcRunnersArm.enabled=false \
-  --set arcRunnersExp.enabled=true \
-  --set arcRunnersArmBuildkit.enabled=false \
-  --set arcRunnersLs1intumExp.enabled=true \
-  --set arcRunnersLs1intumArmBuildkit.enabled=false \
+  --set ghaArcController.enabled=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=true \
+  --set ghaArcScaleSetArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdLs1intum.enabled=true \
+  --set ghaArcScaleSetArmLs1intum.enabled=false \
   --wait --timeout 10m
 ```
 
@@ -110,41 +116,52 @@ helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
 ```bash
 helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   --namespace arc-systems \
-  -f helm-chart/theia-arc-bundle/values-arm64.yaml \
+  -f helm-chart/theia-arc-bundle/values.yaml \
+  -f helm-chart/theia-arc-bundle/values-parma.yaml \
   --set createNamespaces=false \
-  --set arcRunners.enabled=false \
-  --set arcRunnersArm.enabled=false \
-  --set arcRunnersExp.enabled=false \
-  --set arcRunnersArmBuildkit.enabled=false \
-  --set arcRunnersLs1intumExp.enabled=false \
-  --set arcRunnersLs1intumArmBuildkit.enabled=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=false \
+  --set ghaArcScaleSetArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdLs1intum.enabled=false \
+  --set ghaArcScaleSetArmLs1intum.enabled=false \
   --wait --timeout 5m
 
 helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
   --namespace arc-runners \
-  -f helm-chart/theia-arc-bundle/values-arm64.yaml \
+  -f helm-chart/theia-arc-bundle/values.yaml \
+  -f helm-chart/theia-arc-bundle/values-parma.yaml \
   --set createNamespaces=false \
-  --set arcController.enabled=false \
-  --set arcRunners.enabled=false \
-  --set arcRunnersArm.enabled=false \
-  --set arcRunnersExp.enabled=false \
-  --set arcRunnersArmBuildkit.enabled=true \
-  --set arcRunnersLs1intumExp.enabled=false \
-  --set arcRunnersLs1intumArmBuildkit.enabled=true \
+  --set ghaArcController.enabled=false \
+  --set ghaArcScaleSetStatelessAmdEduide.enabled=false \
+  --set ghaArcScaleSetStatelessArmEduide.enabled=false \
+  --set ghaArcScaleSetAmdEduide.enabled=false \
+  --set ghaArcScaleSetArmEduide.enabled=true \
+  --set ghaArcScaleSetAmdLs1intum.enabled=false \
+  --set ghaArcScaleSetArmLs1intum.enabled=true \
   --wait --timeout 10m
 ```
 
 ## Key values
 
+Use `values.yaml` plus exactly one cluster overlay:
+
+| File | Purpose |
+|------|---------|
+| `values.yaml` | Shared defaults; no production runner scale set is enabled by itself |
+| `values-stud.yaml` | stud AMD64 BuildKit runner scale sets for EduIDE and ls1intum |
+| `values-theia-prod.yaml` | theia-prod AMD64 BuildKit runner scale sets for EduIDE and ls1intum |
+| `values-parma.yaml` | parma ARM64 BuildKit runner scale sets for EduIDE and ls1intum |
+
 | Value | Meaning |
 |------|---------|
-| `arcController.enabled` | Enable ARC controller subchart |
-| `arcRunners.enabled` | Legacy AMD64 stateless set (disabled in current target topology) |
-| `arcRunnersArm.enabled` | Legacy ARM64 stateless set (disabled in current target topology) |
-| `arcRunnersExp.enabled` | AMD64 BuildKit runner set (`arc-buildkit-eduide-amd64`) |
-| `arcRunnersArmBuildkit.enabled` | ARM64 BuildKit runner set (`arc-buildkit-eduide-arm64`) |
-| `arcRunnersLs1intumExp.enabled` | AMD64 BuildKit runner set for ls1intum |
-| `arcRunnersLs1intumArmBuildkit.enabled` | ARM64 BuildKit runner set for ls1intum |
+| `ghaArcController.enabled` | Enable ARC controller subchart |
+| `ghaArcScaleSetStatelessAmdEduide.enabled` | Legacy AMD64 stateless set (disabled in current target topology) |
+| `ghaArcScaleSetStatelessArmEduide.enabled` | Legacy ARM64 stateless set (disabled in current target topology) |
+| `ghaArcScaleSetAmdEduide.enabled` | AMD64 BuildKit runner set (`arc-buildkit-eduide-amd64`) |
+| `ghaArcScaleSetArmEduide.enabled` | ARM64 BuildKit runner set (`arc-buildkit-eduide-arm64`) |
+| `ghaArcScaleSetAmdLs1intum.enabled` | AMD64 BuildKit runner set for ls1intum |
+| `ghaArcScaleSetArmLs1intum.enabled` | ARM64 BuildKit runner set for ls1intum |
 
 ## Verification
 
