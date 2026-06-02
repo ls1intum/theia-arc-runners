@@ -64,7 +64,7 @@ See [AGENTS.md](AGENTS.md) for the canonical commands and safety notes.
 
 - `kubectl` configured for target cluster (`stud` / `theia-prod` / `parma`)
 - Helm 3.14+
-- GitHub auth secrets in `arc-runners`.
+- GitHub App auth secrets in `arc-runners`.
 
 The deploy commands below create the namespaces first. Then create one secret per GitHub organization:
 
@@ -72,29 +72,22 @@ The deploy commands below create the namespaces first. Then create one secret pe
 kubectl create namespace arc-systems --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace arc-runners --dry-run=client -o yaml | kubectl apply -f -
 
-# EduIDE GitHub App (recommended)
+# EduIDE GitHub App
 kubectl create secret generic github-arc-secret-eduidec \
   --namespace=arc-runners \
   --from-literal=github_app_id="<APP_ID>" \
   --from-literal=github_app_installation_id="<INSTALLATION_ID>" \
   --from-file=github_app_private_key=<path-to-private-key.pem>
 
-# ls1intum GitHub App (recommended)
+# ls1intum GitHub App
 kubectl create secret generic github-arc-secret \
   --namespace=arc-runners \
   --from-literal=github_app_id="<APP_ID>" \
   --from-literal=github_app_installation_id="<INSTALLATION_ID>" \
   --from-file=github_app_private_key=<path-to-private-key.pem>
-
-# Or PATs
-kubectl create secret generic github-arc-secret-eduidec \
-  --namespace=arc-runners \
-  --from-literal=github_token="ghp_xxxxxxxxxxxx"
-
-kubectl create secret generic github-arc-secret \
-  --namespace=arc-runners \
-  --from-literal=github_token="ghp_xxxxxxxxxxxx"
 ```
+
+The documented Helm flow creates namespaces before Helm runs and therefore sets `createNamespaces=false` on every ARC chart install. This avoids Helm namespace ownership conflicts when Part 1 and Part 2 are installed as separate releases.
 
 ### Deploy stud (AMD64 BuildKit runners)
 
@@ -115,6 +108,7 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-stud.yaml \
   --set createNamespaces=false \
+  --set ghaArcController.enabled=true \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -154,6 +148,7 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-theia-prod.yaml \
   --set createNamespaces=false \
+  --set ghaArcController.enabled=true \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -193,6 +188,7 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-parma.yaml \
   --set createNamespaces=false \
+  --set ghaArcController.enabled=true \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -214,6 +210,8 @@ helm upgrade --install theia-arc-runners helm-chart/theia-arc-bundle \
 ```
 
 ### Deploy Zot (standalone)
+
+The current shared Zot deployment runs on `parma` and is consumed by all runner clusters via `131.159.88.117:30081`.
 
 ```bash
 kubectl config use-context parma

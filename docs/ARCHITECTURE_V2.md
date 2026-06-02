@@ -6,10 +6,11 @@ Ephemeral GitHub Actions runners backed by stateful BuildKit workers and a Zot p
 
 ## Clusters
 
-| Cluster | Context | Architecture | Runner Scale Set |
-|---------|---------|--------------|-----------------|
-| theia-prod | `theia-prod` | AMD64 | `arc-buildkit-eduide-amd64` |
-| parma | `parma` | ARM64 | `arc-buildkit-eduide-arm64` |
+| Cluster | Context | Architecture | Runner Scale Sets |
+|---------|---------|--------------|-------------------|
+| stud | `stud` | AMD64 | `arc-buildkit-eduide-stud-amd64`, `arc-buildkit-ls1intum-stud-amd64` |
+| theia-prod | `theia-prod` | AMD64 | `arc-buildkit-eduide-amd64`, `arc-buildkit-ls1intum-amd64` |
+| parma | `parma` | ARM64 | `arc-buildkit-eduide-arm64`, `arc-buildkit-ls1intum-arm64` |
 
 ## Components
 
@@ -27,13 +28,13 @@ Zot is HTTP-only. DinD containers are configured with:
 
 This makes all `docker pull` calls route through Zot transparently — workflows do not need any changes.
 
-Both clusters reach Zot via NodePort `131.159.88.117:30081`.
+All runner clusters reach the current shared Zot deployment on parma via NodePort `131.159.88.117:30081`.
 
 ### 2. Build cache model
 
 The old self-hosted actions cache subchart is no longer deployed by `theia-arc-bundle`. Runner pods use the official `ghcr.io/actions/actions-runner` image, so the chart does not inject cache endpoint overrides.
 
-Docker image pull caching is handled by Zot. Docker build caching is handled by the stateful BuildKit workers.
+Docker image pull caching is handled by Zot. Docker build caching is handled by the stateful BuildKit workers, including layer cache, BuildKit cache layers, and cache mounts.
 
 ### 3. Actions Runner Controller (ARC)
 
@@ -108,6 +109,8 @@ The chart is deployed in **two separate Helm releases** because Helm 3 cannot de
 | Zot PVC | `zot-system` | 250Gi | `longhorn` |
 | BuildKit worker PVCs | `buildkit-exp` / `buildkit` | 7 x 100Gi per cluster | `csi-rbd-sc` / `longhorn` |
 
+BuildKit StatefulSets use soft pod anti-affinity across `kubernetes.io/hostname`: workers prefer different nodes, but scheduling can still proceed if the cluster cannot spread all replicas.
+
 ## Verification
 
 ```bash
@@ -117,7 +120,7 @@ kubectl get pods -n arc-systems
 # Runner scale sets
 kubectl get autoscalingrunnersets -n arc-runners
 
-# Active runner pods (scale from 0 when jobs arrive)
+# Active runner pods
 kubectl get pods -n arc-runners
 
 # Zot sync activity

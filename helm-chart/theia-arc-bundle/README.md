@@ -40,12 +40,14 @@ Helm cannot deploy subcharts to different namespaces in a single release. We dep
 
 1. Kubernetes v1.23+
 2. Helm v3.8+
-3. GitHub App or PAT secrets in `arc-runners`:
+3. GitHub App secrets in `arc-runners`:
    - `github-arc-secret-eduidec` for EduIDE
    - `github-arc-secret` for ls1intum
 4. Storage classes:
    - `csi-rbd-sc` on stud/theia-prod
    - `longhorn` on parma
+
+The documented flow creates namespaces before Helm runs and sets `createNamespaces=false` on every ARC chart install. This avoids Helm namespace ownership conflicts because Part 1 and Part 2 are separate releases.
 
 ## Core deployment commands
 
@@ -59,6 +61,7 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-stud.yaml \
   --set createNamespaces=false \
+  --set ghaArcController.enabled=true \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -86,6 +89,7 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-theia-prod.yaml \
   --set createNamespaces=false \
+  --set ghaArcController.enabled=true \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -113,6 +117,7 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-parma.yaml \
   --set createNamespaces=false \
+  --set ghaArcController.enabled=true \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \

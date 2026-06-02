@@ -31,6 +31,7 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-stud.yaml \
   --set createNamespaces=false \
+  --set ghaArcController.enabled=true \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -43,6 +44,7 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-theia-prod.yaml \
   --set createNamespaces=false \
+  --set ghaArcController.enabled=true \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -55,6 +57,7 @@ helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   -f helm-chart/theia-arc-bundle/values.yaml \
   -f helm-chart/theia-arc-bundle/values-parma.yaml \
   --set createNamespaces=false \
+  --set ghaArcController.enabled=true \
   --set ghaArcScaleSetAmdEduide.enabled=false \
   --set ghaArcScaleSetArmEduide.enabled=false \
   --set ghaArcScaleSetAmdLs1intum.enabled=false \
@@ -219,7 +222,7 @@ Three deployable releases/components are used:
 
 **The Part 1 release name MUST be `theia-arc-systems`** — runner sets reference controller SA `theia-arc-systems-gha-rs-controller` by exact name.
 
-**Registry caching:** Zot is centralized on parma and consumed by both clusters via NodePort `131.159.88.117:30081`.
+**Registry caching:** Zot is centralized on parma and consumed by all runner clusters via NodePort `131.159.88.117:30081`.
 
 **Build execution:** GitHub jobs run on ARC runners with DinD + runner containers. Docker builds are routed by workflow logic to stateful BuildKit workers:
 
@@ -248,7 +251,7 @@ Three deployable releases/components are used:
 ## Operational Notes
 
 - **Uninstall order is critical**: remove runners before controller to avoid ARC finalizer deadlocks.
-- `createNamespaces: false` on parma is intentional to avoid Helm SSA ownership conflicts for `arc-runners`.
+- `createNamespaces: false` is intentional in the documented flow because namespaces are created before Helm and Part 1 / Part 2 are separate releases.
 - `externalSecrets.enabled: false` by default; auth secrets are managed explicitly.
 - The old self-hosted actions cache subchart has been removed from the active bundle.
 - Runner pods use the official `ghcr.io/actions/actions-runner:latest` image.
