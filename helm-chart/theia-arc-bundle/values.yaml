@@ -8,9 +8,8 @@
 # accidentally register production runners.
 
 global:
-  storageClass: "csi-rbd-sc"
-  nodeSelector:
-    kubernetes.io/arch: amd64
+  storageClass: ""
+  nodeSelector: {}
   tolerations: []
 
 createNamespaces: true
@@ -18,16 +17,16 @@ createNamespaces: true
 ghaArcController:
   enabled: true
 
-# AMD64 BuildKit runner set that routes docker builds to stateful BuildKit workers.
+# AMD64 BuildKit runner set for EduIDE.
 # BuildKit workers live in the buildkit namespace (raw manifests).
-# Cluster overlays set the final runner label, e.g. stud or theia-prod.
+# Cluster overlays set the final runner label.
 ghaArcScaleSetAmdEduide:
   enabled: false
   githubConfigUrl: "https://github.com/EduIDE"
   githubConfigSecret: "github-arc-secret-eduidec"
   minRunners: 10
   maxRunners: 50
-  runnerScaleSetName: "arc-buildkit-eduide-theiaprod-amd64"
+  runnerScaleSetName: ""
   controllerServiceAccount:
     namespace: arc-systems
     name: theia-arc-systems-gha-rs-controller
@@ -36,7 +35,7 @@ ghaArcScaleSetAmdEduide:
     numWorkers: 7
   template:
     spec:
-      serviceAccountName: arc-runner-set-amd-sa
+      serviceAccountName: arc-runner-set-amd-eduide-sa
       initContainers:
         - name: init-dind-externals
           image: ghcr.io/actions/actions-runner:latest
@@ -105,7 +104,7 @@ ghaArcScaleSetAmdLs1intum:
   githubConfigSecret: "github-arc-secret-ls1intum"
   minRunners: 10
   maxRunners: 50
-  runnerScaleSetName: "arc-buildkit-ls1intum-theiaprod-amd64"
+  runnerScaleSetName: ""
   controllerServiceAccount:
     namespace: arc-systems
     name: theia-arc-systems-gha-rs-controller
@@ -114,7 +113,7 @@ ghaArcScaleSetAmdLs1intum:
     numWorkers: 7
   template:
     spec:
-      serviceAccountName: arc-runner-set-amd-sa
+      serviceAccountName: arc-runner-set-amd-ls1intum-sa
       initContainers:
         - name: init-dind-externals
           image: ghcr.io/actions/actions-runner:latest
@@ -172,7 +171,7 @@ ghaArcScaleSetAmdLs1intum:
         - name: dind-externals
           emptyDir: {}
 
-# ARM64 BuildKit runner set for parma.
+# ARM64 BuildKit runner set for EduIDE.
 # Routes docker builds to stateful BuildKit workers in the buildkit namespace.
 # Cluster overlays set the final runner label.
 ghaArcScaleSetArmEduide:
@@ -181,7 +180,7 @@ ghaArcScaleSetArmEduide:
   githubConfigSecret: "github-arc-secret-eduidec"
   minRunners: 10
   maxRunners: 50
-  runnerScaleSetName: "arc-buildkit-eduide-parma-arm64"
+  runnerScaleSetName: ""
   controllerServiceAccount:
     namespace: arc-systems
     name: theia-arc-systems-gha-rs-controller
@@ -190,7 +189,7 @@ ghaArcScaleSetArmEduide:
     numWorkers: 7
   template:
     spec:
-      serviceAccountName: arc-runner-set-arm-sa
+      serviceAccountName: arc-runner-set-arm-eduide-sa
       initContainers:
         - name: init-dind-externals
           image: ghcr.io/actions/actions-runner:latest
@@ -250,14 +249,14 @@ ghaArcScaleSetArmEduide:
         - name: dind-externals
           emptyDir: {}
 
-# ls1intum ARM64 BuildKit runner set for parma.
+# ARM64 BuildKit runner set for ls1intum.
 ghaArcScaleSetArmLs1intum:
   enabled: false
   githubConfigUrl: "https://github.com/ls1intum"
   githubConfigSecret: "github-arc-secret-ls1intum"
   minRunners: 10
   maxRunners: 50
-  runnerScaleSetName: "arc-buildkit-ls1intum-parma-arm64"
+  runnerScaleSetName: ""
   controllerServiceAccount:
     namespace: arc-systems
     name: theia-arc-systems-gha-rs-controller
@@ -266,7 +265,7 @@ ghaArcScaleSetArmLs1intum:
     numWorkers: 7
   template:
     spec:
-      serviceAccountName: arc-runner-set-arm-sa
+      serviceAccountName: arc-runner-set-arm-ls1intum-sa
       initContainers:
         - name: init-dind-externals
           image: ghcr.io/actions/actions-runner:latest

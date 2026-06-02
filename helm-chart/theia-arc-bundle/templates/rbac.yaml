@@ -1,20 +1,44 @@
 {{- if or .Values.ghaArcScaleSetAmdEduide.enabled .Values.ghaArcScaleSetArmEduide.enabled .Values.ghaArcScaleSetAmdLs1intum.enabled .Values.ghaArcScaleSetArmLs1intum.enabled }}
+{{- if .Values.ghaArcScaleSetAmdEduide.enabled }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: arc-runner-set-amd-sa
+  name: arc-runner-set-amd-eduide-sa
   namespace: arc-runners
   labels:
     {{- include "theia-arc-bundle.labels" . | nindent 4 }}
 ---
+{{- end }}
+{{- if .Values.ghaArcScaleSetAmdLs1intum.enabled }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: arc-runner-set-arm-sa
+  name: arc-runner-set-amd-ls1intum-sa
   namespace: arc-runners
   labels:
     {{- include "theia-arc-bundle.labels" . | nindent 4 }}
 ---
+{{- end }}
+{{- if .Values.ghaArcScaleSetArmEduide.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: arc-runner-set-arm-eduide-sa
+  namespace: arc-runners
+  labels:
+    {{- include "theia-arc-bundle.labels" . | nindent 4 }}
+---
+{{- end }}
+{{- if .Values.ghaArcScaleSetArmLs1intum.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: arc-runner-set-arm-ls1intum-sa
+  namespace: arc-runners
+  labels:
+    {{- include "theia-arc-bundle.labels" . | nindent 4 }}
+---
+{{- end }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -38,36 +62,76 @@ rules:
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get", "list", "watch"]
+{{- if .Values.ghaArcScaleSetAmdEduide.enabled }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: arc-runner-set-amd-rb
+  name: arc-runner-set-amd-eduide-rb
   namespace: arc-runners
   labels:
     {{- include "theia-arc-bundle.labels" . | nindent 4 }}
 subjects:
   - kind: ServiceAccount
-    name: arc-runner-set-amd-sa
+    name: arc-runner-set-amd-eduide-sa
     namespace: arc-runners
 roleRef:
   kind: Role
   name: arc-runner-kubernetes-mode-role
   apiGroup: rbac.authorization.k8s.io
+{{- end }}
+{{- if .Values.ghaArcScaleSetAmdLs1intum.enabled }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: arc-runner-set-arm-rb
+  name: arc-runner-set-amd-ls1intum-rb
   namespace: arc-runners
   labels:
     {{- include "theia-arc-bundle.labels" . | nindent 4 }}
 subjects:
   - kind: ServiceAccount
-    name: arc-runner-set-arm-sa
+    name: arc-runner-set-amd-ls1intum-sa
     namespace: arc-runners
 roleRef:
   kind: Role
   name: arc-runner-kubernetes-mode-role
   apiGroup: rbac.authorization.k8s.io
+{{- end }}
+{{- if .Values.ghaArcScaleSetArmEduide.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: arc-runner-set-arm-eduide-rb
+  namespace: arc-runners
+  labels:
+    {{- include "theia-arc-bundle.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: arc-runner-set-arm-eduide-sa
+    namespace: arc-runners
+roleRef:
+  kind: Role
+  name: arc-runner-kubernetes-mode-role
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
+{{- if .Values.ghaArcScaleSetArmLs1intum.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: arc-runner-set-arm-ls1intum-rb
+  namespace: arc-runners
+  labels:
+    {{- include "theia-arc-bundle.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: arc-runner-set-arm-ls1intum-sa
+    namespace: arc-runners
+roleRef:
+  kind: Role
+  name: arc-runner-kubernetes-mode-role
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
 {{- end }}

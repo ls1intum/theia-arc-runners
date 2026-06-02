@@ -6,7 +6,8 @@ description: >
 
   Prerequisites:
     - Must run on one of the BuildKit runner sets, for example
-      arc-buildkit-eduide-stud-amd64 or arc-buildkit-eduide-parma-arm64.
+      arc-buildkit-eduide-stud-amd64, arc-buildkit-ls1intum-stud-amd64,
+      arc-buildkit-eduide-parma-arm64, or arc-buildkit-ls1intum-parma-arm64.
     - The runner pod already has BUILDKIT_NAMESPACE and BUILDKIT_NUM_WORKERS in its environment
       (injected by the ARC runner template in values.yaml). These inputs default to those env vars.
 

@@ -143,7 +143,7 @@ Use `values.yaml` plus exactly one cluster overlay:
 
 | File | Purpose |
 |------|---------|
-| `values.yaml` | Shared defaults; no production runner scale set is enabled by itself |
+| `values.yaml` | Neutral shared defaults; no production runner scale set is enabled and no concrete cluster runner name is defined by itself |
 | `values-stud.yaml` | stud AMD64 BuildKit runner scale sets for EduIDE and ls1intum |
 | `values-theia-prod.yaml` | theia-prod AMD64 BuildKit runner scale sets for EduIDE and ls1intum |
 | `values-parma.yaml` | parma ARM64 BuildKit runner scale sets for EduIDE and ls1intum |
@@ -155,6 +155,8 @@ Use `values.yaml` plus exactly one cluster overlay:
 | `ghaArcScaleSetAmdLs1intum.enabled` | AMD64 BuildKit runner set for ls1intum; final name comes from the cluster overlay |
 | `ghaArcScaleSetArmEduide.enabled` | ARM64 BuildKit runner set for EduIDE; final name comes from the cluster overlay |
 | `ghaArcScaleSetArmLs1intum.enabled` | ARM64 BuildKit runner set for ls1intum; final name comes from the cluster overlay |
+
+Runner ServiceAccounts are named by architecture and organization, for example `arc-runner-set-amd-eduide-sa` and `arc-runner-set-arm-ls1intum-sa`. The chart renders only the ServiceAccounts and RoleBindings needed by enabled scale sets.
 
 ## Verification
 

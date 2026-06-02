@@ -197,7 +197,7 @@ kubectl delete namespace arc-runners arc-systems zot-system buildkit --ignore-no
 ├── helm-chart/
 │   ├── theia-arc-bundle/          # Umbrella Helm chart (controller/runner sets)
 │   │   ├── Chart.yaml             # Chart metadata + dependencies
-│   │   ├── values.yaml            # shared defaults; no production scale set enabled by itself
+│   │   ├── values.yaml            # neutral shared defaults; no cluster runner names here
 │   │   ├── values-stud.yaml       # stud AMD64 runner scale sets
 │   │   ├── values-theia-prod.yaml # theia-prod AMD64 runner scale sets
 │   │   ├── values-parma.yaml      # parma ARM64 runner scale sets
@@ -247,6 +247,12 @@ Three deployable releases/components are used:
 - Namespaces:
   - `arc-systems`, `arc-runners`, `zot-system`
   - `buildkit` on every runner cluster
+- Cluster overlays:
+  - are the only source for concrete runner labels, node architecture, and storage class
+  - must keep org, cluster, and architecture explicit in runner labels: `arc-buildkit-<org>-<cluster>-<arch>`
+- Runner ServiceAccounts:
+  - are named by architecture and organization, e.g. `arc-runner-set-amd-eduide-sa`
+  - are rendered only for enabled scale sets
 - Active runner set names:
   - `arc-buildkit-eduide-stud-amd64`
   - `arc-buildkit-eduide-theiaprod-amd64`
