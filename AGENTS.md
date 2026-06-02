@@ -24,7 +24,19 @@ The stack is: Helm 3 umbrella chart + Kubernetes YAML + GitHub Actions workflows
 ```bash
 kubectl create namespace arc-systems --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace arc-runners --dry-run=client -o yaml | kubectl apply -f -
+```
 
+Assign each runtime namespace to the matching Rancher project after that namespace exists:
+
+| Cluster | Rancher project | Namespaces |
+|---------|-----------------|------------|
+| `stud` | `ARC Runners Stud` | `arc-systems`, `arc-runners`, `buildkit` |
+| `theia-prod` | `ARC Runners theiaprod` | `arc-systems`, `arc-runners`, `buildkit` |
+| `parma` | `ARC Runners parma` | `arc-systems`, `arc-runners`, `buildkit`, `zot-system` |
+
+Prefer the Rancher UI for project assignment. If the project does not exist, create it there first. Only use `field.cattle.io/projectId` when the cluster-specific Rancher project ID is known. `arc-systems` and `arc-runners` exist after the namespace commands above; assign `buildkit` after Part 0 creates it, and assign `zot-system` on parma after the Zot namespace exists.
+
+```bash
 # stud (AMD64)
 helm upgrade --install theia-arc-systems helm-chart/theia-arc-bundle \
   --namespace arc-systems \
@@ -267,6 +279,7 @@ Three deployable releases/components are used:
 
 - **Uninstall order is critical**: remove runners before controller to avoid ARC finalizer deadlocks.
 - `createNamespaces: false` is intentional in the documented flow because namespaces are created before Helm and Part 1 / Part 2 are separate releases.
+- Assign `arc-systems`, `arc-runners`, `buildkit`, and on parma `zot-system` to the matching Rancher project after namespace creation.
 - GitHub App auth secrets are managed explicitly; the active chart does not create them.
 - The old self-hosted actions cache subchart has been removed from the active bundle.
 - Runner pods use the official `ghcr.io/actions/actions-runner:latest` image.

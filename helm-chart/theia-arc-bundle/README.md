@@ -46,6 +46,10 @@ Helm cannot deploy subcharts to different namespaces in a single release. We dep
 4. Storage classes:
    - `csi-rbd-sc` on stud/theia-prod
    - `longhorn` on parma
+5. Rancher project assignment after namespace creation:
+   - `stud`: `ARC Runners Stud`
+   - `theia-prod`: `ARC Runners theiaprod`
+   - `parma`: `ARC Runners parma`
 
 The documented flow creates namespaces before Helm runs and sets `createNamespaces=false` on every ARC chart install. This avoids Helm namespace ownership conflicts because Part 1 and Part 2 are separate releases.
 

@@ -65,13 +65,44 @@ See [AGENTS.md](AGENTS.md) for the canonical commands and safety notes.
 - `kubectl` configured for target cluster (`stud` / `theia-prod` / `parma`)
 - Helm 3.14+
 - GitHub App auth secrets in `arc-runners`.
+- Rancher projects exist for the target clusters:
+  - `stud`: `ARC Runners Stud`
+  - `theia-prod`: `ARC Runners theiaprod`
+  - `parma`: `ARC Runners parma`
 
-The deploy commands below create the namespaces first. Then create one secret per GitHub organization:
+The deploy commands below create the namespaces first:
 
 ```bash
 kubectl create namespace arc-systems --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace arc-runners --dry-run=client -o yaml | kubectl apply -f -
+```
 
+### Rancher project assignment
+
+Assign each runtime namespace to the matching Rancher project after that namespace exists:
+
+| Cluster | Rancher project | Namespaces |
+|---------|-----------------|------------|
+| `stud` | `ARC Runners Stud` | `arc-systems`, `arc-runners`, `buildkit` |
+| `theia-prod` | `ARC Runners theiaprod` | `arc-systems`, `arc-runners`, `buildkit` |
+| `parma` | `ARC Runners parma` | `arc-systems`, `arc-runners`, `buildkit`, `zot-system` |
+
+If the project does not exist yet, create it in the Rancher UI first. Prefer assigning namespaces in the Rancher UI because Rancher project IDs are cluster-specific and are not the same as the display names above. `arc-systems` and `arc-runners` exist after the namespace commands above; assign `buildkit` after Part 0 creates it, and assign `zot-system` on parma after the Zot namespace exists.
+
+If the Rancher project ID is known, namespace assignment can also be applied by annotation:
+
+```bash
+kubectl annotate namespace arc-systems field.cattle.io/projectId="<cluster-id>:<project-id>" --overwrite
+kubectl annotate namespace arc-runners field.cattle.io/projectId="<cluster-id>:<project-id>" --overwrite
+kubectl annotate namespace buildkit field.cattle.io/projectId="<cluster-id>:<project-id>" --overwrite
+
+# parma only, after Zot namespace exists
+kubectl annotate namespace zot-system field.cattle.io/projectId="<cluster-id>:<project-id>" --overwrite
+```
+
+Then create one secret per GitHub organization:
+
+```bash
 # EduIDE GitHub App
 kubectl create secret generic github-arc-secret-eduidec \
   --namespace=arc-runners \
