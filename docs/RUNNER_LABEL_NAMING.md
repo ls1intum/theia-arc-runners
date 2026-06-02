@@ -38,6 +38,14 @@ Keep labels such as `arc-buildkit-eduide-stud-amd64` and `arc-buildkit-ls1intum-
 
 This is the current production-safe choice. It is clear in GitHub, Kubernetes, logs, and troubleshooting output. The downside is that workflow routing must know which organization it is targeting.
 
+### Keep Org-Specific Reusable Workflow Defaults
+
+Keep organization-specific runner labels in the cluster and hide them behind organization-specific reusable workflow defaults.
+
+For example, EduIDE can maintain or consume its own fork/copy of the reusable workflow with EduIDE runner labels as the defaults, while ls1intum keeps the ls1intum runner labels as the defaults in its reusable workflow. Downstream repositories then call their organization's reusable workflow without repeating runner label details in every repository.
+
+This is likely the best near-term compromise. The runner labels remain explicit and collision-free, but migrations are still centralized: if AMD64 moves from `theia-prod` to `stud`, or a runner label changes again later, only the organization's central reusable workflow needs to be updated. Every repository using that workflow inherits the new default routing.
+
 ### Use Org-Neutral Labels With Separate Namespaces
 
 Split runner scale sets by organization into separate namespaces, for example:
@@ -59,4 +67,6 @@ This would be conceptually ideal, but it fights the upstream chart design and ad
 
 Keep the current organization-specific labels until the README installation path is proven stable end to end.
 
-If identical workflow labels across EduIDE and ls1intum become important, prefer splitting the runner scale sets into organization-specific namespaces rather than trying to overload `runnerScaleSetName` inside one namespace.
+For now, prefer organization-specific reusable workflow defaults over changing the cluster naming model. This keeps Kubernetes and GitHub ARC resources easy to debug while still centralizing runner migrations in one workflow file per organization.
+
+If identical workflow labels across EduIDE and ls1intum become a hard requirement later, prefer splitting the runner scale sets into organization-specific namespaces rather than trying to overload `runnerScaleSetName` inside one namespace.
