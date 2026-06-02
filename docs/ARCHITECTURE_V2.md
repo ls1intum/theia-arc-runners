@@ -111,6 +111,8 @@ The chart is deployed in **two separate Helm releases** because Helm 3 cannot de
 
 The current 7 BuildKit workers per cluster are an arbitrary operational baseline, not a hard architectural limit. One BuildKit worker can handle multiple builds at once. On multi-node clusters, especially if stud grows, the worker count can be increased and may reasonably move toward one worker per node. BuildKit StatefulSets use soft pod anti-affinity across `kubernetes.io/hostname`: workers prefer different nodes, but scheduling can still proceed if the cluster cannot spread all replicas. Be conservative on parma because it is currently a single-node cluster.
 
+Runner scale set `minRunners: 10` and `maxRunners: 50` are arbitrary operational baselines as well. They can be increased for larger clusters, but changes should be evaluated together with runner pod CPU and memory requests/limits so the configured runner pool does not overcommit the available nodes.
+
 ## Verification
 
 ```bash

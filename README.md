@@ -56,6 +56,8 @@ Runner pods keep the DinD + runner sidecar layout. Docker builds are routed to r
 
 BuildKit workers run as separate StatefulSet pods with persistent PVC-backed cache. This keeps runner pods disposable while preserving Docker layer cache, BuildKit cache layers, and BuildKit cache mounts across workflow runs. The current 7-worker count is arbitrary: one worker can handle multiple builds at once, and on multi-node clusters it can be increased when more nodes are available. The workers use soft pod anti-affinity, so they prefer different nodes but may co-locate if needed. On parma, be conservative because it is currently a single-node cluster. For more context, see [ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md).
 
+Runner scale sets currently use `minRunners: 10` and `maxRunners: 50`. These are also operational baselines, not hard architecture limits. Larger clusters can raise those values, but runner pod CPU/memory requests and limits should be reviewed at the same time so autoscaling capacity matches real node capacity.
+
 ## Deployment
 
 See [AGENTS.md](AGENTS.md) for the canonical commands and safety notes.

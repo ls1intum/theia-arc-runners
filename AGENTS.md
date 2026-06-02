@@ -250,6 +250,8 @@ Three deployable releases/components are used:
 
 The 7-worker count is arbitrary. One BuildKit worker can handle multiple builds at once. On multi-node clusters, scale the StatefulSet replicas and matching runner `BUILDKIT_NUM_WORKERS` value together; one worker per node is reasonable if capacity exists. The pod anti-affinity is soft, so workers prefer separate nodes but can still co-locate. Be conservative on parma because it is currently a single-node cluster.
 
+Runner scale set `minRunners: 10` and `maxRunners: 50` are arbitrary baselines too. Larger clusters can use higher values, but check runner pod CPU/memory requests and limits at the same time so scheduled capacity matches real node capacity.
+
 ---
 
 ## Naming conventions
@@ -287,5 +289,6 @@ The 7-worker count is arbitrary. One BuildKit worker can handle multiple builds 
 - Runner pods use the official `ghcr.io/actions/actions-runner:latest` image.
 - BuildKit workers are separate StatefulSet pods so Docker layer cache, BuildKit cache layers, and cache mounts persist outside disposable runner pods.
 - Keep BuildKit StatefulSet `replicas` and chart `buildkit.numWorkers` in sync.
+- Treat runner `minRunners`, `maxRunners`, and pod resources as capacity-tuning values, not fixed architecture requirements.
 - Keep docs aligned with manifests; when mismatched, trust `values.yaml`, `values-<cluster>.yaml`, and `infra/**` YAML.
 - Zot startup can fail on low inotify settings (`failed to create a new hot reloader`); raise node inotify limits and restart pod.

@@ -162,6 +162,8 @@ Use `values.yaml` plus exactly one cluster overlay:
 
 Runner ServiceAccounts are named by architecture and organization, for example `arc-runner-set-amd-eduide-sa` and `arc-runner-set-arm-ls1intum-sa`. The chart renders only the ServiceAccounts and RoleBindings needed by enabled scale sets.
 
+The default `minRunners: 10` and `maxRunners: 50` values are operational baselines. They can be increased for larger clusters, but review runner CPU/memory requests and limits at the same time.
+
 ## Verification
 
 ```bash

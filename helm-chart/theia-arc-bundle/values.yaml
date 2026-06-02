@@ -24,6 +24,7 @@ ghaArcScaleSetAmdEduide:
   enabled: false
   githubConfigUrl: "https://github.com/EduIDE"
   githubConfigSecret: "github-arc-secret-eduidec"
+  # Operational baseline. Tune with cluster size and runner pod resources.
   minRunners: 10
   maxRunners: 50
   runnerScaleSetName: ""
@@ -103,6 +104,7 @@ ghaArcScaleSetAmdLs1intum:
   enabled: false
   githubConfigUrl: "https://github.com/ls1intum"
   githubConfigSecret: "github-arc-secret-ls1intum"
+  # Operational baseline. Tune with cluster size and runner pod resources.
   minRunners: 10
   maxRunners: 50
   runnerScaleSetName: ""
@@ -180,6 +182,7 @@ ghaArcScaleSetArmEduide:
   enabled: false
   githubConfigUrl: "https://github.com/EduIDE"
   githubConfigSecret: "github-arc-secret-eduidec"
+  # Operational baseline. Tune with cluster size and runner pod resources.
   minRunners: 10
   maxRunners: 50
   runnerScaleSetName: ""
@@ -257,6 +260,7 @@ ghaArcScaleSetArmLs1intum:
   enabled: false
   githubConfigUrl: "https://github.com/ls1intum"
   githubConfigSecret: "github-arc-secret-ls1intum"
+  # Operational baseline. Tune with cluster size and runner pod resources.
   minRunners: 10
   maxRunners: 50
   runnerScaleSetName: ""
