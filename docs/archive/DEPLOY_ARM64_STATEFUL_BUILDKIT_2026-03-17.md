@@ -33,7 +33,7 @@ Updated:
   - Added dependency alias: `ghaArcScaleSetArmEduide`
 - `helm-chart/theia-arc-bundle/values.yaml`
   - Added full `ghaArcScaleSetArmEduide` block
-  - Runner scale set name: `arc-buildkit-eduide-arm64`
+  - Runner scale set name: `arc-buildkit-eduide-parma-arm64`
   - Added env vars for workflow routing:
     - `BUILDKIT_NAMESPACE=buildkit`
     - `BUILDKIT_NUM_WORKERS=7`
@@ -85,7 +85,7 @@ Verified healthy state:
 - BuildKit PVCs: all 7 `Bound` on `longhorn`
 - Headless service `buildkitd` present in namespace `buildkit`
 - AutoscalingRunnerSet present:
-  - `arc-buildkit-eduide-arm64`
+  - `arc-buildkit-eduide-parma-arm64`
 - Runner pods for that set: all `2/2 Running`
 - Secret used by set exists:
   - `github-arc-secret-eduidec` in `arc-runners`
@@ -94,5 +94,5 @@ Verified healthy state:
 
 - This rollout is **manual selection only**; no automatic fallback behavior was introduced.
 - Workflow jobs should target the new label explicitly:
-  - `runs-on: arc-buildkit-eduide-arm64`
+  - `runs-on: arc-buildkit-eduide-parma-arm64`
 - BuildKit routing variables are injected via runner env and expected by workflow logic.

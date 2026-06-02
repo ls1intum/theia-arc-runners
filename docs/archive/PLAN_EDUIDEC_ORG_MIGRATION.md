@@ -6,8 +6,8 @@
 ## Final implemented outcome
 
 - EduIDE is served by one BuildKit runner set per cluster:
-  - `arc-buildkit-eduide-amd64` (theia-prod)
-  - `arc-buildkit-eduide-arm64` (parma)
+  - `arc-buildkit-eduide-theiaprod-amd64` (theia-prod)
+  - `arc-buildkit-eduide-parma-arm64` (parma)
 - Legacy ls1intum-focused and intermediate EduIDEC split releases were removed from active deployment.
 - Dedicated `theia-arc-runners-eduidec` release is no longer used.
 
@@ -15,7 +15,7 @@
 
 | Resource | theia-prod | parma |
 |----------|------------|-------|
-| Active runner set | `arc-buildkit-eduide-amd64` | `arc-buildkit-eduide-arm64` |
+| Active runner set | `arc-buildkit-eduide-theiaprod-amd64` | `arc-buildkit-eduide-parma-arm64` |
 | BuildKit namespace | `buildkit-exp` | `buildkit` |
 | GitHub org URL | `https://github.com/EduIDE` | `https://github.com/EduIDE` |
 | Auth secret | `github-arc-secret-eduidec` | `github-arc-secret-eduidec` |
@@ -25,9 +25,9 @@
 Workflows must target one of these labels explicitly:
 
 ```yaml
-runs-on: arc-buildkit-eduide-amd64
+runs-on: arc-buildkit-eduide-theiaprod-amd64
 # or
-runs-on: arc-buildkit-eduide-arm64
+runs-on: arc-buildkit-eduide-parma-arm64
 ```
 
 No automatic fallback mode is assumed by this migration record.

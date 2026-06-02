@@ -19,6 +19,8 @@ ghaArcScaleSetAmdLs1intum:
 
 ghaArcScaleSetArmEduide:
   enabled: true
+  runnerScaleSetName: "arc-buildkit-eduide-parma-arm64"
 
 ghaArcScaleSetArmLs1intum:
   enabled: true
+  runnerScaleSetName: "arc-buildkit-ls1intum-parma-arm64"

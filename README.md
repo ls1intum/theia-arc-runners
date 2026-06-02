@@ -9,8 +9,8 @@ BuildKit-focused runner sets backed by stateful BuildKit workers and a shared Zo
 | Cluster | Architecture | Runner Sets | BuildKit Namespace | BuildKit Storage Class | Zot Mirror |
 |---------|--------------|-------------|--------------------|------------------------|------------|
 | stud | AMD64 | `arc-buildkit-eduide-stud-amd64`, `arc-buildkit-ls1intum-stud-amd64` | `buildkit-exp` | `csi-rbd-sc` | `131.159.88.117:30081` |
-| theia-prod | AMD64 | `arc-buildkit-eduide-amd64`, `arc-buildkit-ls1intum-amd64` | `buildkit-exp` | `csi-rbd-sc` | `131.159.88.117:30081` |
-| parma | ARM64 | `arc-buildkit-eduide-arm64`, `arc-buildkit-ls1intum-arm64` | `buildkit` | `longhorn` | `131.159.88.117:30081` |
+| theia-prod | AMD64 | `arc-buildkit-eduide-theiaprod-amd64`, `arc-buildkit-ls1intum-theiaprod-amd64` | `buildkit-exp` | `csi-rbd-sc` | `131.159.88.117:30081` |
+| parma | ARM64 | `arc-buildkit-eduide-parma-arm64`, `arc-buildkit-ls1intum-parma-arm64` | `buildkit` | `longhorn` | `131.159.88.117:30081` |
 
 Use `helm-chart/theia-arc-bundle/values.yaml` plus exactly one cluster overlay:
 
@@ -241,8 +241,8 @@ kubectl --context=parma get pods -n buildkit
 Expected runner sets:
 
 - `stud`: `arc-buildkit-eduide-stud-amd64`, `arc-buildkit-ls1intum-stud-amd64`
-- `theia-prod`: `arc-buildkit-eduide-amd64`, `arc-buildkit-ls1intum-amd64`
-- `parma`: `arc-buildkit-eduide-arm64`, `arc-buildkit-ls1intum-arm64`
+- `theia-prod`: `arc-buildkit-eduide-theiaprod-amd64`, `arc-buildkit-ls1intum-theiaprod-amd64`
+- `parma`: `arc-buildkit-eduide-parma-arm64`, `arc-buildkit-ls1intum-parma-arm64`
 
 ## Documentation
 

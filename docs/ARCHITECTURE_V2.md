@@ -9,8 +9,8 @@ Ephemeral GitHub Actions runners backed by stateful BuildKit workers and a Zot p
 | Cluster | Context | Architecture | Runner Scale Sets |
 |---------|---------|--------------|-------------------|
 | stud | `stud` | AMD64 | `arc-buildkit-eduide-stud-amd64`, `arc-buildkit-ls1intum-stud-amd64` |
-| theia-prod | `theia-prod` | AMD64 | `arc-buildkit-eduide-amd64`, `arc-buildkit-ls1intum-amd64` |
-| parma | `parma` | ARM64 | `arc-buildkit-eduide-arm64`, `arc-buildkit-ls1intum-arm64` |
+| theia-prod | `theia-prod` | AMD64 | `arc-buildkit-eduide-theiaprod-amd64`, `arc-buildkit-ls1intum-theiaprod-amd64` |
+| parma | `parma` | ARM64 | `arc-buildkit-eduide-parma-arm64`, `arc-buildkit-ls1intum-parma-arm64` |
 
 ## Components
 

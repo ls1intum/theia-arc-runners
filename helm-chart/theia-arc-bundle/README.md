@@ -19,10 +19,10 @@ Active runner scale set labels used in production:
 
 - `arc-buildkit-eduide-stud-amd64` (stud)
 - `arc-buildkit-ls1intum-stud-amd64` (stud)
-- `arc-buildkit-eduide-amd64` (theia-prod)
-- `arc-buildkit-ls1intum-amd64` (theia-prod)
-- `arc-buildkit-eduide-arm64` (parma)
-- `arc-buildkit-ls1intum-arm64` (parma)
+- `arc-buildkit-eduide-theiaprod-amd64` (theia-prod)
+- `arc-buildkit-ls1intum-theiaprod-amd64` (theia-prod)
+- `arc-buildkit-eduide-parma-arm64` (parma)
+- `arc-buildkit-ls1intum-parma-arm64` (parma)
 
 ## Why multiple Helm releases?
 
@@ -151,8 +151,8 @@ Use `values.yaml` plus exactly one cluster overlay:
 | Value | Meaning |
 |------|---------|
 | `ghaArcController.enabled` | Enable ARC controller subchart |
-| `ghaArcScaleSetAmdEduide.enabled` | AMD64 BuildKit runner set (`arc-buildkit-eduide-amd64`) |
-| `ghaArcScaleSetArmEduide.enabled` | ARM64 BuildKit runner set (`arc-buildkit-eduide-arm64`) |
+| `ghaArcScaleSetAmdEduide.enabled` | AMD64 BuildKit runner set (`arc-buildkit-eduide-theiaprod-amd64`) |
+| `ghaArcScaleSetArmEduide.enabled` | ARM64 BuildKit runner set (`arc-buildkit-eduide-parma-arm64`) |
 | `ghaArcScaleSetAmdLs1intum.enabled` | AMD64 BuildKit runner set for ls1intum |
 | `ghaArcScaleSetArmLs1intum.enabled` | ARM64 BuildKit runner set for ls1intum |
 

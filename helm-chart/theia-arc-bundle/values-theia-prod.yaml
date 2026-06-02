@@ -11,11 +11,11 @@ createNamespaces: false
 
 ghaArcScaleSetAmdEduide:
   enabled: true
-  runnerScaleSetName: "arc-buildkit-eduide-amd64"
+  runnerScaleSetName: "arc-buildkit-eduide-theiaprod-amd64"
 
 ghaArcScaleSetAmdLs1intum:
   enabled: true
-  runnerScaleSetName: "arc-buildkit-ls1intum-amd64"
+  runnerScaleSetName: "arc-buildkit-ls1intum-theiaprod-amd64"
 
 ghaArcScaleSetArmEduide:
   enabled: false

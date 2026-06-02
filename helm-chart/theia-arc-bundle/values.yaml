@@ -20,14 +20,14 @@ ghaArcController:
 
 # AMD64 BuildKit runner set that routes docker builds to stateful BuildKit workers.
 # BuildKit workers live in the buildkit-exp namespace (raw manifests).
-# Workflows opt in explicitly with: runs-on: arc-buildkit-eduide-amd64
+# Workflows opt in explicitly with: runs-on: arc-buildkit-eduide-theiaprod-amd64
 ghaArcScaleSetAmdEduide:
   enabled: false
   githubConfigUrl: "https://github.com/EduIDE"
   githubConfigSecret: "github-arc-secret-eduidec"
   minRunners: 10
   maxRunners: 50
-  runnerScaleSetName: "arc-buildkit-eduide-amd64"
+  runnerScaleSetName: "arc-buildkit-eduide-theiaprod-amd64"
   controllerServiceAccount:
     namespace: arc-systems
     name: theia-arc-systems-gha-rs-controller
@@ -105,7 +105,7 @@ ghaArcScaleSetAmdLs1intum:
   githubConfigSecret: "github-arc-secret"
   minRunners: 10
   maxRunners: 50
-  runnerScaleSetName: "arc-buildkit-ls1intum-amd64"
+  runnerScaleSetName: "arc-buildkit-ls1intum-theiaprod-amd64"
   controllerServiceAccount:
     namespace: arc-systems
     name: theia-arc-systems-gha-rs-controller
@@ -174,14 +174,14 @@ ghaArcScaleSetAmdLs1intum:
 
 # ARM64 BuildKit runner set for parma.
 # Routes docker builds to stateful BuildKit workers in the buildkit namespace.
-# Workflows opt in explicitly with: runs-on: arc-buildkit-eduide-arm64
+# Workflows opt in explicitly with: runs-on: arc-buildkit-eduide-parma-arm64
 ghaArcScaleSetArmEduide:
   enabled: false
   githubConfigUrl: "https://github.com/EduIDE"
   githubConfigSecret: "github-arc-secret-eduidec"
   minRunners: 10
   maxRunners: 50
-  runnerScaleSetName: "arc-buildkit-eduide-arm64"
+  runnerScaleSetName: "arc-buildkit-eduide-parma-arm64"
   controllerServiceAccount:
     namespace: arc-systems
     name: theia-arc-systems-gha-rs-controller
@@ -257,7 +257,7 @@ ghaArcScaleSetArmLs1intum:
   githubConfigSecret: "github-arc-secret"
   minRunners: 10
   maxRunners: 50
-  runnerScaleSetName: "arc-buildkit-ls1intum-arm64"
+  runnerScaleSetName: "arc-buildkit-ls1intum-parma-arm64"
   controllerServiceAccount:
     namespace: arc-systems
     name: theia-arc-systems-gha-rs-controller

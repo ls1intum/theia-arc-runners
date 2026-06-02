@@ -12,7 +12,7 @@
   - PVC size `500Gi` per worker
   - preferred pod anti-affinity across hosts
 - ARC build runner set used for this path:
-  - `arc-buildkit-eduide-amd64`
+  - `arc-buildkit-eduide-theiaprod-amd64`
 - Runner env and workflow contract:
   - `BUILDKIT_NAMESPACE=buildkit-exp`
   - `BUILDKIT_NUM_WORKERS=7`
@@ -31,9 +31,9 @@
 - `buildkitd-0..6` Running in namespace `buildkit-exp`
 - 7 PVCs Bound on `csi-rbd-sc`
 - headless service `buildkitd` present
-- autoscaling runner set `arc-buildkit-eduide-amd64` active in `arc-runners`
+- autoscaling runner set `arc-buildkit-eduide-theiaprod-amd64` active in `arc-runners`
 
 ## Notes
 
 - This document is retained as a completion record.
-- Historical experiment naming (`arc-runner-set-buildkit-exp`) has been superseded by `arc-buildkit-eduide-amd64`.
+- Historical experiment naming (`arc-runner-set-buildkit-exp`) has been superseded by `arc-buildkit-eduide-theiaprod-amd64`.
