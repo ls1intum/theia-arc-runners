@@ -97,6 +97,33 @@ kubectl get secret github-arc-secret-eduidec -n arc-runners -o jsonpath='{.data}
 kubectl get secret github-arc-secret-ls1intum -n arc-runners -o jsonpath='{.data}' | jq 'keys'
 ```
 
+### Runner set remains Pending after creating a missing GitHub App secret
+
+If an organization secret is created after the Helm release was already installed, the existing `AutoscalingRunnerSet` may stay in `Pending` until ARC reconciles it again.
+
+First rerun the normal README `helm upgrade --install` command for that cluster. If the runner set still does not reconcile, restart only the controller pod so it reloads the existing resources:
+
+```bash
+kubectl delete pod -n arc-systems -l app.kubernetes.io/name=gha-rs-controller
+kubectl rollout status deploy/theia-arc-systems-gha-rs-controller -n arc-systems --timeout=3m
+```
+
+Healthy logs show ARC creating or reusing the runner scale set, adding the scale set ID annotation, creating an `AutoscalingListener`, and creating `EphemeralRunner` resources.
+
+If a listener repeatedly starts and exits with a message like `ephemeralrunnersets.actions.github.com "<name>" not found`, it likely kept a stale listener config for an `EphemeralRunnerSet` that ARC already cleaned up. Delete only that `AutoscalingListener`; ARC recreates it from the current runner set:
+
+```bash
+kubectl delete autoscalinglistener -n arc-systems <listener-name>
+```
+
+Then verify:
+
+```bash
+kubectl get autoscalingrunnersets,autoscalinglisteners,ephemeralrunnersets -A
+kubectl get pods -n arc-systems
+kubectl get pods -n arc-runners
+```
+
 ### Runner pods not starting (stuck Pending)
 
 ```bash
