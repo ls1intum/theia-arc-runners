@@ -84,11 +84,11 @@ ghaArcScaleSetAmdEduide:
               mountPath: /var/run
           resources:
             requests:
-              cpu: 500m
-              memory: 1Gi
+              cpu: 1000m
+              memory: 2Gi
             limits:
-              cpu: 4000m
-              memory: 8Gi
+              cpu: 16000m
+              memory: 32Gi
       volumes:
         - name: work
           emptyDir: {}
@@ -162,11 +162,11 @@ ghaArcScaleSetAmdLs1intum:
               mountPath: /var/run
           resources:
             requests:
-              cpu: 500m
-              memory: 1Gi
+              cpu: 1000m
+              memory: 2Gi
             limits:
-              cpu: 4000m
-              memory: 8Gi
+              cpu: 16000m
+              memory: 32Gi
       volumes:
         - name: work
           emptyDir: {}
@@ -240,11 +240,11 @@ ghaArcScaleSetArmEduide:
               mountPath: /var/run
           resources:
             requests:
-              cpu: 500m
-              memory: 1Gi
+              cpu: 1000m
+              memory: 2Gi
             limits:
-              cpu: 4000m
-              memory: 8Gi
+              cpu: 16000m
+              memory: 32Gi
       volumes:
         - name: work
           emptyDir:
@@ -318,11 +318,11 @@ ghaArcScaleSetArmLs1intum:
               mountPath: /var/run
           resources:
             requests:
-              cpu: 500m
-              memory: 1Gi
+              cpu: 1000m
+              memory: 2Gi
             limits:
-              cpu: 4000m
-              memory: 8Gi
+              cpu: 16000m
+              memory: 32Gi
       volumes:
         - name: work
           emptyDir:
