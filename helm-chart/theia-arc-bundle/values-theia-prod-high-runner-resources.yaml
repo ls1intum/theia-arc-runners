@@ -1,0 +1,59 @@
+# Optional test overlay for theia-prod.
+# Purpose: temporarily run AMD64 runner pods with larger resource requests and
+# limits while validating heavy Artemis workflows.
+#
+# Helm replaces lists instead of deep-merging them. Therefore this overlay has
+# to replace the full `containers` list, not only the runner resource subtree.
+
+theiaProdHighRunnerContainers: &theiaProdHighRunnerContainers
+  - name: dind
+    image: docker:dind
+    args:
+      - dockerd
+      - --host=unix:///var/run/docker.sock
+      - --group=1001
+      - --registry-mirror=http://131.159.88.117:30081
+      - --insecure-registry=131.159.88.117:30081
+    securityContext:
+      privileged: true
+    volumeMounts:
+      - name: work
+        mountPath: /home/runner/_work
+      - name: dind-sock
+        mountPath: /var/run
+      - name: dind-externals
+        mountPath: /home/runner/externals
+  - name: runner
+    image: ghcr.io/actions/actions-runner:latest
+    command: ["/home/runner/run.sh"]
+    env:
+      - name: DOCKER_HOST
+        value: unix:///var/run/docker.sock
+      - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
+        value: "false"
+      - name: BUILDKIT_NAMESPACE
+        value: buildkit
+      - name: BUILDKIT_NUM_WORKERS
+        value: "7"
+    volumeMounts:
+      - name: work
+        mountPath: /home/runner/_work
+      - name: dind-sock
+        mountPath: /var/run
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 16000m
+        memory: 32Gi
+
+ghaArcScaleSetAmdEduide:
+  template:
+    spec:
+      containers: *theiaProdHighRunnerContainers
+
+ghaArcScaleSetAmdLs1intum:
+  template:
+    spec:
+      containers: *theiaProdHighRunnerContainers
