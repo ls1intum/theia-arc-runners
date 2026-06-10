@@ -19,8 +19,14 @@ ghaArcScaleSetAmdLs1intum:
 
 ghaArcScaleSetArmEduide:
   enabled: true
+  # Parma is currently a single ARM64 node. Keep the warm pool at 10, but do
+  # not burst toward the shared 50-runner default; Docker-in-Docker startup and
+  # BuildKit frontend containers become unstable when ARC floods the node.
+  maxRunners: 10
   runnerScaleSetName: "arc-buildkit-eduide-parma-arm64"
 
 ghaArcScaleSetArmLs1intum:
   enabled: true
+  # Same single-node limit as EduIDE.
+  maxRunners: 10
   runnerScaleSetName: "arc-buildkit-ls1intum-parma-arm64"

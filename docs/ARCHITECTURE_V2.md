@@ -20,13 +20,7 @@ Zot is deployed on parma as a standalone Helm release (`theia-zot`) in namespace
 
 On a cache miss, Zot fetches from `registry-1.docker.io`, caches the blob, and serves it. On subsequent pulls the blob is served from the PVC without contacting Docker Hub.
 
-Zot is HTTP-only. DinD containers are configured with:
-```
---registry-mirror=http://<zot-addr>
---insecure-registry=<zot-addr>
-```
-
-This makes all `docker pull` calls route through Zot transparently — workflows do not need any changes.
+Zot is HTTP-only and is used by the BuildKit worker topology to reduce Docker Hub traffic. Workflows do not need registry-cache-specific changes.
 
 All runner clusters reach the current shared Zot deployment on parma via NodePort `131.159.88.117:30081`.
 
@@ -44,7 +38,7 @@ Docker image pull caching is handled by Zot. Docker build caching is handled by 
 
 ### 3. Actions Runner Controller (ARC)
 
-**Mode:** custom runner pod template with manual DinD sidecar
+**Mode:** ARC documented DinD pod topology with native sidecar initContainer
 
 **Namespace split** (GitHub security best practice):
 - `arc-systems`: ARC controller, listeners
@@ -59,20 +53,21 @@ Docker image pull caching is handled by Zot. Docker build caching is handled by 
 ├─────────────────────────────────────────────────┤
 │ init: init-dind-externals                       │
 │   copies runner binaries → shared emptyDir      │
-├──────────────────────┬──────────────────────────┤
-│ dind container       │ runner container          │
-│ - docker daemon      │ - actions runner binary   │
-│ - privileged         │ - DOCKER_HOST=unix://sock │
-│ - --registry-mirror  │ - runs workflow steps     │
-│   → Zot              │                           │
-└──────────────────────┴──────────────────────────┘
+│ init sidecar: dind                              │
+│   docker daemon, privileged, restartPolicy=Always│
+├─────────────────────────────────────────────────┤
+│ runner container                                │
+│ - actions runner binary                         │
+│ - DOCKER_HOST=unix://sock                       │
+│ - runs workflow steps                           │
+└─────────────────────────────────────────────────┘
          shared volumes:
            dind-sock   → /var/run        (docker socket)
-           work        → /home/runner    (emptyDir, Memory on ARM64)
+           work        → /home/runner/_work
            externals   → runner binaries
 ```
 
-On parma, the work volume uses `emptyDir.medium: Memory` (30Gi) — RAM-backed, ~1000x faster than network storage.
+The DinD sidecar follows the official ARC chart's documented DinD pod topology, but the pod spec is kept explicit in this repository instead of enabling `containerMode.type: dind` directly. The chart-generated DinD startup probe cannot currently be tuned via values, and parma needs a longer `docker info` timeout when many runner pods start at once. This keeps the Docker daemon lifecycle aligned with ARC runner cleanup behavior while avoiding one-second startup probe timeouts under load.
 
 ## Network Flow
 
@@ -86,8 +81,8 @@ ARC Controller (arc-systems)
 Runner Pod (arc-runners)
   │  docker pull alpine
   ▼
-dind container
-  │  --registry-mirror → Zot
+ARC-managed DinD / remote BuildKit
+  │  Docker Hub traffic reduced by Zot/BuildKit cache topology
   ▼
 Zot (zot-system)
   ├── cache HIT  → serve from PVC immediately
@@ -117,7 +112,7 @@ The chart is deployed in **two separate Helm releases** because Helm 3 cannot de
 
 The current 7 BuildKit workers per cluster are an arbitrary operational baseline, not a hard architectural limit. One BuildKit worker can handle multiple builds at once. On multi-node clusters, especially if stud grows, the worker count can be increased and may reasonably move toward one worker per node. BuildKit StatefulSets use soft pod anti-affinity across `kubernetes.io/hostname`: workers prefer different nodes, but scheduling can still proceed if the cluster cannot spread all replicas. Be conservative on parma because it is currently a single-node cluster.
 
-Runner scale set `minRunners: 10` and `maxRunners: 50` are arbitrary operational baselines as well. They can be increased for larger clusters, but changes should be evaluated together with runner pod CPU and memory requests/limits so the configured runner pool does not overcommit the available nodes.
+Runner scale set `minRunners: 10` is an arbitrary operational baseline as well. The shared default `maxRunners: 50` applies to the multi-node AMD64 clusters; parma overrides `maxRunners: 10` because it is currently a single ARM64 node and should not burst a large DinD runner pool onto one machine. These values can be increased for larger clusters, but changes should be evaluated together with runner pod CPU and memory requests/limits so the configured runner pool does not overcommit the available nodes.
 
 ## Verification
 

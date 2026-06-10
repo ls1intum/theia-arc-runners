@@ -7,13 +7,13 @@ Common issues and solutions for the self-hosted runner infrastructure.
 ### "Cannot connect to the Docker daemon at unix:///var/run/docker.sock"
 
 **Symptom:** Workflow fails immediately with a Docker connection error.  
-**Cause:** The runner container started before the DinD sidecar was ready.
+**Cause:** The runner container started before the ARC-managed DinD sidecar was ready.
 
 The runner template already includes a wait loop that polls for the daemon. If this still occurs:
 
 ```bash
-# Check dind container status
-kubectl get pod -n arc-runners <runner-pod> -o jsonpath='{.status.containerStatuses[*].name}'
+# Check dind sidecar/initContainer status
+kubectl get pod -n arc-runners <runner-pod> -o jsonpath='{.status.initContainerStatuses[*].name}'
 kubectl logs -n arc-runners <runner-pod> -c dind --previous
 ```
 
@@ -27,7 +27,7 @@ Verify both containers share the volume:
 kubectl get pod -n arc-runners <runner-pod> -o jsonpath='{.spec.volumes}'
 ```
 
-Both `dind` and `runner` containers must mount `dind-sock` to `/var/run`.
+Both ARC-managed `dind` and `runner` must mount `dind-sock` to `/var/run`.
 
 ---
 
@@ -41,17 +41,12 @@ Zot is the pull-through cache for Docker Hub. If runners still hit rate limits:
 # 1. Confirm Zot pod is Running
 kubectl get pods -n zot-system | grep zot
 
-# 2. Confirm dind is using the registry mirror
-kubectl get pod -n arc-runners <runner-pod> \
-  -o jsonpath='{.spec.containers[?(@.name=="dind")].args}'
-# Expected: [..., "--registry-mirror=http://131.159.88.117:30081", ...]
-
-# 3. Check Zot logs for sync activity
+# 2. Check Zot logs for sync activity
 kubectl logs -n zot-system -l app.kubernetes.io/name=zot --tail=50
 # Look for: "sync: on-demand sync for image library/alpine"
 ```
 
-If Zot is down, runners will fall back to direct Docker Hub pulls (and hit rate limits). Fix Zot first, then recreate runner pods.
+If Zot is down, BuildKit and Docker pulls may fall back to direct Docker Hub pulls depending on the caller. Fix Zot first, then recreate affected runner/build pods.
 
 ### Image pull errors on parma (ARM64)
 

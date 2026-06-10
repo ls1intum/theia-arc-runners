@@ -38,7 +38,7 @@ spec:
           # Privileged variant — theia-prod runs kernel 5.4 (Ubuntu 20.04) which is below
           # the 5.11 minimum required for rootless --oci-worker-no-process-sandbox.
           # Privileged mode is already used by DinD in runner pods on this cluster.
-          image: moby/buildkit:latest
+          image: moby/buildkit:v0.30.0
           args:
             - --addr
             - tcp://0.0.0.0:1234

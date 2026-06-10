@@ -19,6 +19,8 @@ data:
     # Override defaults to remove the 48h/512MB cap on cache mounts.
     # Each worker has a 100Gi PVC at /var/lib/buildkit.
     [worker.oci]
+      max-parallelism = 2
+
       # Cache mounts (apt, yarn, pip) and source checkouts — keep 30 days.
       [[worker.oci.gcpolicy]]
         filters = ["type==source.local", "type==exec.cachemount", "type==source.git.checkout"]

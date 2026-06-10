@@ -35,7 +35,7 @@ spec:
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: buildkitd
-          image: moby/buildkit:latest
+          image: moby/buildkit:v0.30.0
           args:
             - --addr
             - tcp://0.0.0.0:1234

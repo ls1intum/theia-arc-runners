@@ -27,7 +27,7 @@ Use `helm-chart/theia-arc-bundle/values.yaml` plus exactly one cluster overlay:
 - BuildKit pods prefer spreading across nodes with soft pod anti-affinity
 - Zot pull-through cache for `docker.io` (removes Docker Hub rate-limit pressure)
 - Official ARC runner image (`ghcr.io/actions/actions-runner`) and ARC Helm charts
-- Memory-backed work volume on parma runners (`emptyDir.medium: Memory`, 30Gi)
+- ARC documented DinD topology with native sidecar lifecycle on Kubernetes 1.29+
 
 ## Components
 
@@ -40,25 +40,25 @@ Zot is deployed as a standalone release on parma:
 - storage: Longhorn PVC (100Gi)
 - service: NodePort `30081`
 
-Runner DinD containers are configured with:
-
-```text
---registry-mirror=http://131.159.88.117:30081
---insecure-registry=131.159.88.117:30081
-```
+Runner pods use the DinD topology documented by the official ARC chart. On
+Kubernetes 1.29+ Docker-in-Docker runs as a native sidecar `initContainer` with
+`restartPolicy: Always`, so the DinD lifecycle stays tied to the runner pod
+lifecycle instead of being managed as a separate normal container. The pod spec
+is kept explicit because parma needs a less fragile DinD startup probe under
+parallel runner startup.
 
 Zot primarily exists to avoid Docker Hub pull rate limits. If Docker Hub traffic grows substantially, revisit whether a paid Docker Team account for CI pulls would be simpler than maintaining the mirror. See [ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md) and [ZOT_VS_DOCKER_HUB_SUBSCRIPTION.md](docs/ZOT_VS_DOCKER_HUB_SUBSCRIPTION.md).
 
 ### Runner + BuildKit Model
 
-Runner pods keep the DinD + runner sidecar layout. Docker builds are routed to remote BuildKit workers using workflow-provided routing logic and runner env:
+Runner pods keep Docker available through ARC-managed DinD. Docker builds are routed to remote BuildKit workers using workflow-provided routing logic and runner env:
 
 - `BUILDKIT_NAMESPACE`
 - `BUILDKIT_NUM_WORKERS`
 
 BuildKit workers run as separate StatefulSet pods with persistent PVC-backed cache. This keeps runner pods disposable while preserving Docker layer cache, BuildKit cache layers, and BuildKit cache mounts across workflow runs. The current 7-worker count is arbitrary: one worker can handle multiple builds at once, and on multi-node clusters it can be increased when more nodes are available. The workers use soft pod anti-affinity, so they prefer different nodes but may co-locate if needed. On parma, be conservative because it is currently a single-node cluster. For more context, see [ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md).
 
-Runner scale sets currently use `minRunners: 10` and `maxRunners: 50`. These are also operational baselines, not hard architecture limits. Larger clusters can raise those values, but runner pod CPU/memory requests and limits should be reviewed at the same time so autoscaling capacity matches real node capacity.
+Runner scale sets currently use `minRunners: 10`. The shared default `maxRunners` is 50 for the multi-node AMD64 clusters; parma overrides `maxRunners` to 10 because it is currently a single ARM64 node and should not burst a large DinD runner pool onto one machine. These are operational baselines, not hard architecture limits. Larger clusters can raise those values, but runner pod CPU/memory requests and limits should be reviewed at the same time so autoscaling capacity matches real node capacity.
 
 ## Deployment
 

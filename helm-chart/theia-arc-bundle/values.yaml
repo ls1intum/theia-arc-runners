@@ -17,6 +17,51 @@ createNamespaces: true
 ghaArcController:
   enabled: true
 
+runnerDindInitContainers: &runnerDindInitContainers
+  - name: init-dind-externals
+    image: ghcr.io/actions/actions-runner:latest
+    command: ["cp"]
+    args: ["-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
+    volumeMounts:
+      - name: dind-externals
+        mountPath: /home/runner/tmpDir
+  - name: dind
+    image: docker:dind
+    args:
+      - dockerd
+      - --host=unix:///var/run/docker.sock
+      - --group=$(DOCKER_GROUP_GID)
+    env:
+      - name: DOCKER_GROUP_GID
+        value: "123"
+    securityContext:
+      privileged: true
+    restartPolicy: Always
+    startupProbe:
+      exec:
+        command:
+          - docker
+          - info
+      initialDelaySeconds: 0
+      timeoutSeconds: 10
+      failureThreshold: 60
+      periodSeconds: 5
+    volumeMounts:
+      - name: work
+        mountPath: /home/runner/_work
+      - name: dind-sock
+        mountPath: /var/run
+      - name: dind-externals
+        mountPath: /home/runner/externals
+
+runnerDindVolumes: &runnerDindVolumes
+  - name: work
+    emptyDir: {}
+  - name: dind-sock
+    emptyDir: {}
+  - name: dind-externals
+    emptyDir: {}
+
 # AMD64 BuildKit runner set for EduIDE.
 # BuildKit workers live in the buildkit namespace (raw manifests).
 # Cluster overlays set the final runner label.
@@ -38,31 +83,8 @@ ghaArcScaleSetAmdEduide:
   template:
     spec:
       serviceAccountName: arc-runner-set-amd-eduide-sa
-      initContainers:
-        - name: init-dind-externals
-          image: ghcr.io/actions/actions-runner:latest
-          command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
-          volumeMounts:
-            - name: dind-externals
-              mountPath: /home/runner/tmpDir
+      initContainers: *runnerDindInitContainers
       containers:
-        - name: dind
-          image: docker:dind
-          args:
-            - dockerd
-            - --host=unix:///var/run/docker.sock
-            - --group=1001
-            - --registry-mirror=http://131.159.88.117:30081
-            - --insecure-registry=131.159.88.117:30081
-          securityContext:
-            privileged: true
-          volumeMounts:
-            - name: work
-              mountPath: /home/runner/_work
-            - name: dind-sock
-              mountPath: /var/run
-            - name: dind-externals
-              mountPath: /home/runner/externals
         - name: runner
           image: ghcr.io/actions/actions-runner:latest
           command: ["/home/runner/run.sh"]
@@ -89,13 +111,7 @@ ghaArcScaleSetAmdEduide:
             limits:
               cpu: 4000m
               memory: 8Gi
-      volumes:
-        - name: work
-          emptyDir: {}
-        - name: dind-sock
-          emptyDir: {}
-        - name: dind-externals
-          emptyDir: {}
+      volumes: *runnerDindVolumes
 
 # ls1intum AMD64 BuildKit runner set.
 # Uses the same AMD64 BuildKit worker pool as EduIDE, but registers against a
@@ -118,31 +134,8 @@ ghaArcScaleSetAmdLs1intum:
   template:
     spec:
       serviceAccountName: arc-runner-set-amd-ls1intum-sa
-      initContainers:
-        - name: init-dind-externals
-          image: ghcr.io/actions/actions-runner:latest
-          command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
-          volumeMounts:
-            - name: dind-externals
-              mountPath: /home/runner/tmpDir
+      initContainers: *runnerDindInitContainers
       containers:
-        - name: dind
-          image: docker:dind
-          args:
-            - dockerd
-            - --host=unix:///var/run/docker.sock
-            - --group=1001
-            - --registry-mirror=http://131.159.88.117:30081
-            - --insecure-registry=131.159.88.117:30081
-          securityContext:
-            privileged: true
-          volumeMounts:
-            - name: work
-              mountPath: /home/runner/_work
-            - name: dind-sock
-              mountPath: /var/run
-            - name: dind-externals
-              mountPath: /home/runner/externals
         - name: runner
           image: ghcr.io/actions/actions-runner:latest
           command: ["/home/runner/run.sh"]
@@ -167,13 +160,7 @@ ghaArcScaleSetAmdLs1intum:
             limits:
               cpu: 4000m
               memory: 8Gi
-      volumes:
-        - name: work
-          emptyDir: {}
-        - name: dind-sock
-          emptyDir: {}
-        - name: dind-externals
-          emptyDir: {}
+      volumes: *runnerDindVolumes
 
 # ARM64 BuildKit runner set for EduIDE.
 # Routes docker builds to stateful BuildKit workers in the buildkit namespace.
@@ -196,31 +183,8 @@ ghaArcScaleSetArmEduide:
   template:
     spec:
       serviceAccountName: arc-runner-set-arm-eduide-sa
-      initContainers:
-        - name: init-dind-externals
-          image: ghcr.io/actions/actions-runner:latest
-          command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
-          volumeMounts:
-            - name: dind-externals
-              mountPath: /home/runner/tmpDir
+      initContainers: *runnerDindInitContainers
       containers:
-        - name: dind
-          image: docker:dind
-          args:
-            - dockerd
-            - --host=unix:///var/run/docker.sock
-            - --group=1001
-            - --registry-mirror=http://131.159.88.117:30081
-            - --insecure-registry=131.159.88.117:30081
-          securityContext:
-            privileged: true
-          volumeMounts:
-            - name: work
-              mountPath: /home/runner/_work
-            - name: dind-sock
-              mountPath: /var/run
-            - name: dind-externals
-              mountPath: /home/runner/externals
         - name: runner
           image: ghcr.io/actions/actions-runner:latest
           command: ["/home/runner/run.sh"]
@@ -245,15 +209,7 @@ ghaArcScaleSetArmEduide:
             limits:
               cpu: 4000m
               memory: 8Gi
-      volumes:
-        - name: work
-          emptyDir:
-            medium: Memory
-            sizeLimit: 30Gi
-        - name: dind-sock
-          emptyDir: {}
-        - name: dind-externals
-          emptyDir: {}
+      volumes: *runnerDindVolumes
 
 # ARM64 BuildKit runner set for ls1intum.
 ghaArcScaleSetArmLs1intum:
@@ -274,31 +230,8 @@ ghaArcScaleSetArmLs1intum:
   template:
     spec:
       serviceAccountName: arc-runner-set-arm-ls1intum-sa
-      initContainers:
-        - name: init-dind-externals
-          image: ghcr.io/actions/actions-runner:latest
-          command: ["cp", "-r", "/home/runner/externals/.", "/home/runner/tmpDir/"]
-          volumeMounts:
-            - name: dind-externals
-              mountPath: /home/runner/tmpDir
+      initContainers: *runnerDindInitContainers
       containers:
-        - name: dind
-          image: docker:dind
-          args:
-            - dockerd
-            - --host=unix:///var/run/docker.sock
-            - --group=1001
-            - --registry-mirror=http://131.159.88.117:30081
-            - --insecure-registry=131.159.88.117:30081
-          securityContext:
-            privileged: true
-          volumeMounts:
-            - name: work
-              mountPath: /home/runner/_work
-            - name: dind-sock
-              mountPath: /var/run
-            - name: dind-externals
-              mountPath: /home/runner/externals
         - name: runner
           image: ghcr.io/actions/actions-runner:latest
           command: ["/home/runner/run.sh"]
@@ -323,14 +256,6 @@ ghaArcScaleSetArmLs1intum:
             limits:
               cpu: 4000m
               memory: 8Gi
-      volumes:
-        - name: work
-          emptyDir:
-            medium: Memory
-            sizeLimit: 30Gi
-        - name: dind-sock
-          emptyDir: {}
-        - name: dind-externals
-          emptyDir: {}
+      volumes: *runnerDindVolumes
 
 # Zot is deployed via standalone `theia-zot` chart in `zot-system`.

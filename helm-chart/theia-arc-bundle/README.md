@@ -176,4 +176,4 @@ kubectl get pods -n arc-runners
 
 - If runner sets do not register, verify `github-arc-secret-eduidec` and `github-arc-secret-ls1intum` exist in `arc-runners`.
 - If jobs do not use BuildKit workers, verify runner env vars (`BUILDKIT_NAMESPACE`, `BUILDKIT_NUM_WORKERS`) in generated pods.
-- If image pulls bypass cache, inspect DinD args for mirror endpoint `131.159.88.117:30081`.
+- Runner pods use the ARC-documented DinD pod topology; on Kubernetes 1.29+ DinD should render as an initContainer with `restartPolicy: Always`.

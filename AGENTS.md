@@ -270,14 +270,14 @@ Three deployable releases/components are used:
 
 Zot mainly mitigates Docker Hub pull rate limits. If Docker Hub traffic grows substantially, revisit the architecture decision in `docs/ARCHITECTURE_V2.md`: a paid Docker Hub account injected into the stateful BuildKit workers may be less maintenance than operating Zot.
 
-**Build execution:** GitHub jobs run on ARC runners with DinD + runner containers. Docker builds are routed by workflow logic to stateful BuildKit workers:
+**Build execution:** GitHub jobs run on ARC runners using the DinD pod topology documented by the official ARC chart. On Kubernetes 1.29+ this uses DinD as a native sidecar initContainer with `restartPolicy: Always`, avoiding the old independently managed runner+Dind container lifecycle. The DinD pod spec is explicit in `values.yaml` because the chart-generated startup probe is not tunable via values and was too fragile on parma under parallel runner startup. Docker builds are routed by workflow logic to stateful BuildKit workers:
 
 - stud/theia-prod workers: namespace `buildkit` (`csi-rbd-sc`, currently 7 replicas)
 - parma workers: namespace `buildkit` (`longhorn`, currently 7 replicas)
 
 The 7-worker count is arbitrary. One BuildKit worker can handle multiple builds at once. On multi-node clusters, scale the StatefulSet replicas and matching runner `BUILDKIT_NUM_WORKERS` value together; one worker per node is reasonable if capacity exists. The pod anti-affinity is soft, so workers prefer separate nodes but can still co-locate. Be conservative on parma because it is currently a single-node cluster.
 
-Runner scale set `minRunners: 10` and `maxRunners: 50` are arbitrary baselines too. Larger clusters can use higher values, but check runner pod CPU/memory requests and limits at the same time so scheduled capacity matches real node capacity.
+Runner scale set `minRunners: 10` is an arbitrary baseline too. The shared default `maxRunners: 50` is used for the multi-node AMD64 clusters; parma overrides `maxRunners: 10` because it is currently a single ARM64 node and should not burst a large DinD runner pool onto one machine. Larger clusters can use higher values, but check runner pod CPU/memory requests and limits at the same time so scheduled capacity matches real node capacity.
 
 ---
 

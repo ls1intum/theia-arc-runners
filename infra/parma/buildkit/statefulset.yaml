@@ -37,7 +37,7 @@ spec:
       containers:
         - name: buildkitd
           # Keep privileged mode for compatibility with existing ARC DinD assumptions.
-          image: moby/buildkit:latest
+          image: moby/buildkit:v0.30.0
           args:
             - --addr
             - tcp://0.0.0.0:1234

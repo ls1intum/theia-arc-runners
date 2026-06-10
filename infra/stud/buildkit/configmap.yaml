@@ -17,6 +17,8 @@ data:
 
     # --- Garbage collection ---
     [worker.oci]
+      max-parallelism = 4
+
       # Cache mounts (apt, yarn, pip) and source checkouts: keep 30 days.
       [[worker.oci.gcpolicy]]
         filters = ["type==source.local", "type==exec.cachemount", "type==source.git.checkout"]
